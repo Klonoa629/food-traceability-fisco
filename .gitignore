@@ -1,5 +1,6 @@
 # 编辑器与 IDE
 .idea/
+backend/.idea/
 .vscode/
 *.iml
 
@@ -13,6 +14,7 @@ Thumbs.db
 # 预留：后端构建产物
 backend/target/
 backend/logs/
+backend/*.iml
 
 # 预留：前端构建产物
 frontend/node_modules/
