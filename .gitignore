@@ -1,0 +1,19 @@
+# 编辑器与 IDE
+.idea/
+.vscode/
+*.iml
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
+
+# 预留：后端构建产物
+backend/target/
+backend/logs/
+
+# 预留：前端构建产物
+frontend/node_modules/
+frontend/dist/

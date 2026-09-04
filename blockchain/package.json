@@ -1,0 +1,26 @@
+{
+  "name": "blockchain",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "compile": "hardhat compile && npm run typegen",
+    "test": "hardhat test",
+    "clean": "hardhat clean",
+    "typegen": "typechain --target ethers-v6 --out-dir types --node16-modules \"artifacts/contracts/**/*.json\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^4.0.11",
+    "@nomicfoundation/hardhat-node-test-runner": "^3.0.15",
+    "@typechain/ethers-v6": "^0.5.1",
+    "@types/node": "^22.20.1",
+    "ethers": "^6.16.0",
+    "hardhat": "^3.4.5",
+    "typechain": "^8.3.2",
+    "typescript": "~5.8.0"
+  },
+  "type": "module"
+}
