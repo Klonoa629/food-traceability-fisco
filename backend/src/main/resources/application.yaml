@@ -1,9 +1,15 @@
 server:
   port: 8081
+
 fisco:
   cert-path: conf
   group-id: group0
   peers: 127.0.0.1:20200
+
+webase:
+  sign-url: http://127.0.0.1:5004/WeBASE-Sign
+  hello-address: 0xcceef68c9b4811b32c75df284a1396c7c5509561
+
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
