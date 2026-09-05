@@ -1,6 +1,9 @@
 server:
   port: 8081
-
+fisco:
+  cert-path: conf
+  group-id: group0
+  peers: 127.0.0.1:20200
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver

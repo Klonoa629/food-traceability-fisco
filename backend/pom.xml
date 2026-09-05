@@ -77,6 +77,11 @@
 			<version>3.8.0</version>
 		</dependency>
 		<dependency>
+			<groupId>com.webank</groupId>
+			<artifactId>webank-blockchain-java-crypto</artifactId>
+			<version>1.0.3</version>
+		</dependency>
+		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-api</artifactId>
 			<version>${jjwt.version}</version>
