@@ -29,7 +29,6 @@
 	<properties>
 		<java.version>17</java.version>
 		<mybatis-plus.version>3.5.12</mybatis-plus.version>
-		<fisco-bcos-sdk.version>3.11.2</fisco-bcos-sdk.version>
 		<jjwt.version>0.12.6</jjwt.version>
 	</properties>
 	<dependencies>
