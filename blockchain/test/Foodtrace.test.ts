@@ -7,11 +7,11 @@ import type { Foodtrace } from "../types/Foodtrace.js";
 const { ethers } = await network.create();
 
 /* 测试常量 */
-// 角色编号（与合约 Role 枚举一致）
+// 角色编号（与合约Role枚举一致）
 const Role = {
   FARM: 1, PROCESSOR: 2, INSPECTOR: 3, TRANSPORTER: 4, WAREHOUSE: 5, RETAILER: 6,
 } as const;
-// 环节编号（与合约 Stage 枚举一致）
+// 环节编号（与合约Stage枚举一致）
 const Stage = {
   GROWING: 0, PROCESSING: 1, INSPECTED: 2, IN_TRANSIT: 3, IN_WAREHOUSE: 4, ON_SALE: 5, RECALLED: 6,
 } as const;
@@ -37,14 +37,14 @@ async function setupRoles(ctx: Ctx) {
   await foodtrace.setRole(retailer.address, Role.RETAILER);
 }
 
-// 部署 + 角色 + 基地注册产品 1 号
+// 部署+角色+基地注册产品1号
 async function setupProduct(ctx: Ctx) {
   await setupRoles(ctx);
   const c = ctx.foodtrace.connect(ctx.farm);
   await c.registerProduct("Organic Apple", "B-2026-0901", "planted in spring", "Yantai Farm", "0xhash-001");
 }
 
-// 完整流水线：基地 -> 加工 -> 质检 -> 运输 -> 仓储 -> 零售（产品 1 号）
+// 完整流水线：基地->加工->质检->运输->仓储->零售（产品1号）
 async function runFullChain(ctx: Ctx) {
   const { foodtrace, farm, processor, inspector, transporter, warehouse, retailer } = ctx;
   await foodtrace.connect(farm).handOver(1n, processor.address);
@@ -423,7 +423,7 @@ describe("Handover State Machine", function () {
   it("should reject skipping transport after inspection", async function () {
     const ctx = await deploy();
     await setupProduct(ctx);
-    // 原料检验链路：基地→质检→合格，质检想直接把货交给仓储或零售
+    // 原料检验链路：基地->质检->合格，质检想直接把货交给仓储或零售
     await ctx.foodtrace.connect(ctx.farm).handOver(1n, ctx.inspector.address);
     await ctx.foodtrace.connect(ctx.inspector).inspectProduct(1n, "0xreport", true);
     await expectRevert(
@@ -608,7 +608,7 @@ describe("Query Functions", function () {
     assert.equal(product.batch_no, "B-2026-0901");
     assert.equal(product.current_holder.toLowerCase(), ctx.retailer.address.toLowerCase());
     assert.equal(Number(product.stage), Stage.ON_SALE);
-    // 1 条注册记录 + 4 条环节记录 + 1 条质检记录 + 5 条交接留痕
+    // 1条注册记录+4条环节记录+1条质检记录+5条交接留痕
     assert.equal(product.records.length, 11);
   });
 
@@ -619,9 +619,9 @@ describe("Query Functions", function () {
     const inspected = await ctx.foodtrace.getStageRecords(1n, Stage.INSPECTED);
     const inTransit = await ctx.foodtrace.getStageRecords(1n, Stage.IN_TRANSIT);
     const growing = await ctx.foodtrace.getStageRecords(1n, Stage.GROWING);
-    assert.equal(inspected.length, 2); // 质检记录 + 质检后交接留痕
-    assert.equal(inTransit.length, 2); // 运输记录 + 交接留痕
-    assert.equal(growing.length, 2);   // 注册记录 + 基地交接留痕
+    assert.equal(inspected.length, 2); // 质检记录+质检后交接留痕
+    assert.equal(inTransit.length, 2); // 运输记录+交接留痕
+    assert.equal(growing.length, 2);   // 注册记录+基地交接留痕
   });
 
   it("should look up product by batch number", async function () {

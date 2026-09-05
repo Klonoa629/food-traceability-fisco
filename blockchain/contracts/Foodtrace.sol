@@ -34,7 +34,7 @@ contract Foodtrace {
     }
     // 产品属性
     struct Product {
-        uint256 id;             // 产品 ID（链上自增）
+        uint256 id;             // 产品ID（链上自增）
         string name;            // 产品名称（可重名）
         string batch_no;        // 批次号（业务唯一标识）
         address origin_farm;    // 初始基地（注册者，产品源头）
@@ -47,8 +47,8 @@ contract Foodtrace {
     /* 状态变量 */
     address public regulator;                            // 监管机构（部署者，可移交）
     mapping(address => Role) public roles;               // 机构角色
-    mapping(bytes32 => uint256) public batch_to_product; // 批次号 -> 产品 ID（未占用为 0）
-    uint256 public next_product_id = 1;                  // 产品 ID 自增（起始为 1）
+    mapping(bytes32 => uint256) public batch_to_product; // 批次号->产品 ID（未占用为0）
+    uint256 public next_product_id = 1;                  // 产品ID自增（起始为1）
     mapping(uint256 => Product) public products;         // 产品映射
 
     /* 事件 */
@@ -100,14 +100,14 @@ contract Foodtrace {
     }
 
     /* 内部函数 */
-    // 角色 -> 环节 
+    // 角色->环节 
     function roleToStage(Role r) internal pure returns (Stage) {
-        if (r == Role.FARM) return Stage.GROWING;           // 基地 -> 种植
-        if (r == Role.PROCESSOR) return Stage.PROCESSING;   // 加工厂 -> 加工
-        if (r == Role.INSPECTOR) return Stage.INSPECTED;    // 质检机构 -> 质检
-        if (r == Role.TRANSPORTER) return Stage.IN_TRANSIT; // 物流 -> 运输
-        if (r == Role.WAREHOUSE) return Stage.IN_WAREHOUSE; // 仓库 -> 仓储
-        if (r == Role.RETAILER) return Stage.ON_SALE;       // 零售商 -> 销售
+        if (r == Role.FARM) return Stage.GROWING;           // 基地->种植
+        if (r == Role.PROCESSOR) return Stage.PROCESSING;   // 加工厂->加工
+        if (r == Role.INSPECTOR) return Stage.INSPECTED;    // 质检机构->质检
+        if (r == Role.TRANSPORTER) return Stage.IN_TRANSIT; // 物流->运输
+        if (r == Role.WAREHOUSE) return Stage.IN_WAREHOUSE; // 仓库->仓储
+        if (r == Role.RETAILER) return Stage.ON_SALE;       // 零售商->销售
         revert("Invalid role");  
     }
 
