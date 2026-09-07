@@ -27,11 +27,12 @@ public class SignClient {
         if (resp == null || !Integer.valueOf(0).equals(resp.get("code"))) {
             throw new IllegalStateException("Webase-Sign 签名失败：" + resp);
         }
-        String data = (String) resp.get("data");
+        Map<?, ?> data = (Map<?, ?>) resp.get("data");  // data是对象
+        String sig = (String) data.get("signDataStr");  // 签名在signResult字段里
         // ECDSA生成65字节，返回130位hex（不带“0x”）
-        if (data == null || data.length() != 130) {
-            throw new IllegalStateException("签名数据长度异常（期望130）" + data);
+        if (sig == null || sig.length() != 130) {
+            throw new IllegalStateException("签名数据长度异常（期望130）" + sig);
         }
-        return data;
+        return sig;
     }
 }
