@@ -10,7 +10,12 @@ import org.springframework.beans.factory.annotation.Value;
 
 import java.util.*;
 
-/* Spring配置类：读取证书路径、节点地址、群组ID等配置，初始化FISCO BCOS SDK实例并创建对应群组的链上操作客户端 */
+/**
+ * FISCO BCOS SDK 装配配置
+ *
+ * <p>读取证书路径、节点地址、群组 ID 等配置，初始化 {@link BcosSDK}
+ * 并创建目标群组的 {@link Client}。
+ */
 @Configuration
 public class SdkConfig {
 
@@ -23,7 +28,11 @@ public class SdkConfig {
     @Value("${fisco.peers}")
     private String peers;
 
-    // 初始化SDK，加载证书，连接节点
+    /**
+     * 初始化 SDK 实例：加载证书并建立与节点的长连接
+     *
+     * @return 全局唯一的 BcosSDK 实例
+     */
     @Bean
     public BcosSDK bcosSDK() {
         ConfigProperty prop =  new ConfigProperty();
@@ -39,7 +48,12 @@ public class SdkConfig {
         }
     }
 
-    // 获取群组客户端
+    /**
+     * 获取目标群组的链上操作客户端
+     *
+     * @param bcosSDK 已初始化的 SDK 实例
+     * @return 绑定配置群组的 Client
+     */
     @Bean
     public Client client(BcosSDK bcosSDK) {
         return bcosSDK.getClient(groupId);
