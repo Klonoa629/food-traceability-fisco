@@ -1,4 +1,4 @@
-package com.foodtrace.config;
+package com.foodtrace.controller;
 
 import com.foodtrace.chain.ChainWriter;
 import org.fisco.bcos.sdk.v3.client.Client;
