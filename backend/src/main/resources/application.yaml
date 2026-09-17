@@ -9,6 +9,7 @@ fisco:
 
 webase:
   sign-url: http://127.0.0.1:5004/WeBASE-Sign
+  app-id: foodtrace
   hello-address: "0xcceef68c9b4811b32c75df284a1396c7c5509561"
 
 foodtrace:
