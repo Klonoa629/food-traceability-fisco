@@ -50,7 +50,7 @@ class UserServiceTest {
 
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
     private final LoginUser regulator =
-            new LoginUser(1L, "regulator", true, "regulator_001", "0xabc");
+            new LoginUser(1L, "regulator", true, 0, "regulator_001", "0xabc");
 
     /**
      * 用真实 BCrypt 编码器与各 mock 依赖构造被测服务

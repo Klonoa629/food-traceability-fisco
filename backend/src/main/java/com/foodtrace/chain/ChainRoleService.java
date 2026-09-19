@@ -80,11 +80,10 @@ public class ChainRoleService {
      */
     private String send(String signUserId, String method, List<Object> args, String action) {
         TransactionReceipt receipt = chainWriter.send(signUserId, contractAddress, abi, method, args);
-        // SDK 的回执状态是 int 型，0 表示成功
+        // SDK 的回执状态是 int 型，0 表示成功；失败时还原 revert 具体原因
         if (receipt == null || receipt.getStatus() != 0) {
-            String detail = receipt == null ? "无回执"
-                    : receipt.getStatus() + " " + receipt.getMessage();
-            throw new BizException(ErrorCode.CHAIN_REJECTED, action + "上链失败：" + detail);
+            throw new BizException(ErrorCode.CHAIN_REJECTED,
+                    action + "被链上拒绝：" + RevertReason.describe(receipt));
         }
         return receipt.getTransactionHash();
     }

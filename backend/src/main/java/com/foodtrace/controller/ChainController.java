@@ -1,6 +1,7 @@
 package com.foodtrace.controller;
 
 import com.foodtrace.chain.ChainWriter;
+import com.foodtrace.chain.RevertReason;
 import org.fisco.bcos.sdk.v3.client.Client;
 import org.fisco.bcos.sdk.v3.model.TransactionReceipt;
 import org.springframework.beans.factory.annotation.Value;
@@ -52,6 +53,8 @@ public class ChainController {
                 helloAddress, HELLO_ABI, "set", List.of(body.get("value")));
         return Map.of("txHash", receipt.getTransactionHash(),
                 "status", receipt.getStatus(),  // status=0成功
-                "message", String.valueOf(receipt.getMessage()));
+                // 失败时还原 revert 具体原因
+                "message", receipt.getStatus() != 0
+                        ? RevertReason.describe(receipt) : String.valueOf(receipt.getMessage()));
     }
 }

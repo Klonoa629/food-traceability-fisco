@@ -121,6 +121,19 @@ public class UserService {
     }
 
     /**
+     * 查询生效中的参与机构（供交接时选择下游）
+     *
+     * @return 生效的非监管账户列表
+     */
+    public List<UserInfo> listActiveOrgs() {
+        return userMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                        .eq(SysUser::getStatus, 1)
+                        .eq(SysUser::getIsRegulator, false)
+                        .orderByDesc(SysUser::getId))
+                .stream().map(UserInfo::from).toList();
+    }
+
+    /**
      * 审批账户：Sign 开托管户 → 链上发角色 → 账户生效
      *
      * @param id       待审批账户 id

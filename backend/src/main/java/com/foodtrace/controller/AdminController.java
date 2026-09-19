@@ -2,10 +2,13 @@ package com.foodtrace.controller;
 
 import com.foodtrace.common.Result;
 import com.foodtrace.dto.ApproveRequest;
+import com.foodtrace.dto.ProductVO;
+import com.foodtrace.dto.RecallRequest;
 import com.foodtrace.dto.UserInfo;
 import com.foodtrace.entity.OperateLog;
 import com.foodtrace.security.LoginUser;
 import com.foodtrace.service.OperateLogService;
+import com.foodtrace.service.ProductService;
 import com.foodtrace.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +31,8 @@ public class AdminController {
     private final UserService userService;
     /** 审计服务 */
     private final OperateLogService operateLogService;
+    /** 产品服务 */
+    private final ProductService productService;
 
     /**
      * 查询账户列表
@@ -66,6 +71,21 @@ public class AdminController {
     public Result<UserInfo> revoke(@PathVariable Long id,
                                    @AuthenticationPrincipal LoginUser operator) {
         return Result.ok(userService.revoke(id, operator));
+    }
+
+    /**
+     * 召回产品（链上进入召回终态）
+     *
+     * @param id       产品 id
+     * @param request  召回请求
+     * @param operator 当前监管账户
+     * @return 更新后的产品
+     */
+    @PostMapping("/products/{id}/recall")
+    public Result<ProductVO> recall(@PathVariable long id,
+                                    @Valid @RequestBody RecallRequest request,
+                                    @AuthenticationPrincipal LoginUser operator) {
+        return Result.ok(productService.recall(id, request, operator));
     }
 
     /**
