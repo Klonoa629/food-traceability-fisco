@@ -15,7 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.util.*;
 
 /**
  * 监管管理接口（仅 REGULATOR 角色可访问）
@@ -99,5 +99,15 @@ public class AdminController {
     public Result<List<OperateLog>> listLogs(@RequestParam(required = false) String action,
                                              @RequestParam(required = false) Long userId) {
         return Result.ok(operateLogService.list(action, userId));
+    }
+
+    /**
+     * 链上校验审计记录：比对数据库中的交易哈希与链上实际交易
+     *
+     * @return 审计记录 id -> 是否与链上一致
+     */
+    @GetMapping("/logs/verify")
+    public Result<Map<Long, Boolean>> verifyLogs() {
+        return Result.ok(operateLogService.verifyOnChain());
     }
 }

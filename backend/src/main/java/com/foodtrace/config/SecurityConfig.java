@@ -38,6 +38,7 @@ public class SecurityConfig {
                         // 放行错误页：sendError 的 ERROR 分发会重入过滤链，不放行会把 403 覆盖成 401
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
+                        .requestMatchers("/api/public/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("REGULATOR")
                         .anyRequest().authenticated())
                 .exceptionHandling(e -> e

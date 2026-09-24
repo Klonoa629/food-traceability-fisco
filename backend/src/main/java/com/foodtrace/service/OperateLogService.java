@@ -1,13 +1,15 @@
 package com.foodtrace.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.foodtrace.config.ContractProperties;
 import com.foodtrace.entity.OperateLog;
 import com.foodtrace.mapper.OperateLogMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.fisco.bcos.sdk.v3.client.Client;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
+import java.util.*;
 
 /**
  * 操作审计服务
@@ -23,6 +25,10 @@ import java.util.List;
 public class OperateLogService {
     /** 审计 Mapper */
     private final OperateLogMapper operateLogMapper;
+    /** 链客户端 */
+    private final Client client;
+    /** 合约连接配置 */
+    private final ContractProperties contractProperties;
 
     /**
      * 记录一条操作审计
@@ -67,5 +73,33 @@ public class OperateLogService {
         }
         wrapper.orderByDesc(OperateLog::getId);
         return operateLogMapper.selectList(wrapper);
+    }
+
+    /**
+     * 链上校验所有带交易哈希的审计记录：交易须存在且指向溯源合约
+     *
+     * @return 审计记录 id -> 是否与链上一致（false 说明数据库记录疑似被篡改）
+     */
+    public Map<Long, Boolean> verifyOnChain() {
+        Map<Long, Boolean> result = new LinkedHashMap<>();
+        List<OperateLog> logs = operateLogMapper.selectList(
+                new LambdaQueryWrapper<OperateLog>().isNotNull(OperateLog::getChainTxHash));
+        for (OperateLog entry : logs) {
+            result.put(entry.getId(), isOnChain(entry.getChainTxHash()));
+        }
+        return result;
+    }
+
+    /**
+     * 校验单笔交易哈希：链上可查且接收方为溯源合约
+     */
+    private boolean isOnChain(String txHash) {
+        try {
+            var tx = client.getTransaction(txHash, false).getTransaction().orElse(null);
+            return tx != null && tx.getTo() != null
+                    && tx.getTo().equalsIgnoreCase(contractProperties.getContractAddress());
+        } catch (Exception e) {
+            return false;
+        }
     }
 }
