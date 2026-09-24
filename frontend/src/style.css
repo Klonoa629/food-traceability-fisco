@@ -1,0 +1,135 @@
+/* 全局样式与主题变量(业务页:浅绿田园风) */
+:root {
+  --ft-bg: #f7f9f4;
+  --ft-primary: #2f9e63;
+  --ft-primary-deep: #1e7a4c;
+  --ft-primary-soft: #e3f2e9;
+  --ft-text: #1c2b22;
+  --ft-text-secondary: #5c6f63;
+  --ft-danger: #d64550;
+  --ft-warning: #eb8b25;
+  --ft-border: #dce7dc;
+  --ft-card: #ffffff;
+
+  --el-color-primary: #2f9e63;
+  --el-color-primary-light-3: #63bb8c;
+  --el-color-primary-light-5: #8fcdad;
+  --el-color-primary-light-7: #bbdfcd;
+  --el-color-primary-light-8: #d2eade;
+  --el-color-primary-light-9: #e9f5ee;
+  --el-color-primary-dark-2: #1e7a4c;
+  --el-color-danger: #d64550;
+  --el-color-warning: #eb8b25;
+  --el-font-size-base: 15px;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #app {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  font-size: 15px;
+  background: var(--ft-bg);
+  color: var(--ft-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono {
+  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+}
+
+.app-shell {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 28px;
+  height: 60px;
+  background: var(--ft-card);
+  border-bottom: 1px solid var(--ft-border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ft-primary-deep);
+  letter-spacing: 0.5px;
+}
+
+.app-brand .leaf {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--ft-primary), var(--ft-primary-deep));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 15px;
+}
+
+.app-header .spacer { flex: 1; }
+
+.app-main {
+  flex: 1;
+  width: 100%;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 24px 28px 48px;
+}
+
+.nav-link {
+  color: var(--ft-text-secondary);
+  text-decoration: none;
+  font-size: 15px;
+  padding: 6px 12px;
+  border-radius: 6px;
+}
+.nav-link:hover { color: var(--ft-primary-deep); background: var(--ft-primary-soft); }
+.nav-link.router-link-active { color: var(--ft-primary-deep); font-weight: 600; background: var(--ft-primary-soft); }
+
+.ft-card {
+  background: var(--ft-card);
+  border: 1px solid var(--ft-border);
+  border-radius: 12px;
+}
+
+.stage-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.recalled-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--ft-danger);
+}
+
+.muted { color: var(--ft-text-secondary); }
