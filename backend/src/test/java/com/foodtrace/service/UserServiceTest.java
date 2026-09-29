@@ -6,6 +6,7 @@ import com.foodtrace.chain.SignClient;
 import com.foodtrace.common.BizException;
 import com.foodtrace.common.ErrorCode;
 import com.foodtrace.dto.LoginRequest;
+import com.foodtrace.dto.ProductVO;
 import com.foodtrace.dto.RegisterRequest;
 import com.foodtrace.dto.UserInfo;
 import com.foodtrace.entity.SysUser;
@@ -19,6 +20,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -45,6 +48,8 @@ class UserServiceTest {
     private ChainReader chainReader;
     @Mock
     private JwtUtil jwtUtil;
+    @Mock
+    private ProductService productService;
 
     private UserService userService;
 
@@ -58,7 +63,7 @@ class UserServiceTest {
     @BeforeEach
     void setUp() {
         userService = new UserService(userMapper, operateLogService, passwordEncoder,
-                jwtUtil, signClient, chainRoleService, chainReader);
+                jwtUtil, signClient, chainRoleService, chainReader, productService);
     }
 
     /**
@@ -144,11 +149,30 @@ class UserServiceTest {
     }
 
     @Test
+    void revokeShouldRejectWhenHolderHasInFlightProducts() {
+        SysUser active = user(1);
+        active.setChainAddress("0xfarm");
+        when(userMapper.selectById(2L)).thenReturn(active);
+        when(productService.findInFlight("0xfarm"))
+                .thenReturn(List.of(new ProductVO(3, "阳光草莓", "B1", "0xfarm",
+                        "0xfarm", 0, false, List.of())));
+
+        assertThatThrownBy(() -> userService.revoke(2L, regulator))
+                .isInstanceOf(BizException.class)
+                .extracting(e -> ((BizException) e).getCode())
+                .isEqualTo(ErrorCode.INVALID_STATE.getCode());
+        // 链上收角色不应被触发
+        verify(chainRoleService, never()).removeRole(anyString(), anyString());
+        verify(userMapper, never()).updateById(any(SysUser.class));
+    }
+
+    @Test
     void revokeShouldRemoveChainRoleThenMarkRevoked() {
         SysUser active = user(1);
         active.setChainAddress("0xfarm");
         active.setSignUserId("ft_farm_a");
         when(userMapper.selectById(2L)).thenReturn(active);
+        when(productService.findInFlight("0xfarm")).thenReturn(List.of());
         when(chainReader.roles("0xfarm")).thenReturn(1);
         when(chainRoleService.removeRole("regulator_001", "0xfarm")).thenReturn("0xtx2");
 

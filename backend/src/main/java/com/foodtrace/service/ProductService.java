@@ -37,6 +37,8 @@ public class ProductService {
             5, 4, // 仓库 -> 仓储
             6, 5  // 零售 -> 销售
     );
+    /** 销售环节，达到后视为流转终态（召回为 6，自然大于该值） */
+    private static final int STAGE_ON_SALE = 5;
 
     /** 链上产品交易封装 */
     private final ChainProductService chainProductService;
@@ -165,6 +167,24 @@ public class ProductService {
         List<ProductVO> products = new ArrayList<>();
         for (long id = chainReader.productCount(); id >= 1; id--) {
             products.add(chainReader.product(id));
+        }
+        return products;
+    }
+
+    /**
+     * 查询机构名下仍在流转中的产品（未到销售/召回终态）
+     *
+     * @param chainAddress 机构链上地址
+     * @return 在途产品列表，新的在前
+     */
+    public List<ProductVO> findInFlight(String chainAddress) {
+        List<ProductVO> products = new ArrayList<>();
+        for (long id = chainReader.productCount(); id >= 1; id--) {
+            ProductVO product = chainReader.product(id);
+            if (chainAddress.equalsIgnoreCase(product.currentHolder())
+                    && product.stage() < STAGE_ON_SALE) {
+                products.add(product);
+            }
         }
         return products;
     }

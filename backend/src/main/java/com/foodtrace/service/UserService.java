@@ -46,6 +46,8 @@ public class UserService {
     private final ChainRoleService chainRoleService;
     /** 链上只读查询 */
     private final ChainReader chainReader;
+    /** 产品业务服务 */
+    private final ProductService productService;
 
     /**
      * 按登录名查询账户（认证过滤器使用）
@@ -173,12 +175,12 @@ public class UserService {
     }
 
     /**
-     * 吊销账户：链上收角色（如有）→ 账户置为已吊销
+     * 吊销账户：先确认名下无在途产品，再链上收角色并置为已吊销
      *
      * @param id       生效账户 id
      * @param operator 执行吊销的监管账户
      * @return 吊销后的账户信息
-     * @throws BizException 账户不存在、状态不符或吊销自己时抛出
+     * @throws BizException 账户不存在、状态不符、名下有在途产品或吊销自己时抛出
      */
     public UserInfo revoke(Long id, LoginUser operator) {
         if (id.equals(operator.id())) {
@@ -189,8 +191,16 @@ public class UserService {
             throw new BizException(ErrorCode.INVALID_STATE, "仅生效账户可吊销");
         }
         // 监管账户不持有六类机构角色，仅普通机构需要链上收角色
+        // 在途产品检查：吊销后机构无法再交接，名下未终态产品会被锁在半路
         String txHash = null;
         if (!Boolean.TRUE.equals(user.getIsRegulator()) && user.getChainAddress() != null) {
+            List<ProductVO> inFlight = productService.findInFlight(user.getChainAddress());
+            if (!inFlight.isEmpty()) {
+                ProductVO first = inFlight.get(0);
+                throw new BizException(ErrorCode.INVALID_STATE,
+                        "机构名下有 " + inFlight.size() + " 个在途产品（如 " + first.name()
+                                + " #" + first.id() + "），请先完成交接或召回");
+            }
             if (readChainRole(user.getChainAddress()) != 0) {
                 txHash = chainRoleService.removeRole(operator.signUserId(), user.getChainAddress());
             }
