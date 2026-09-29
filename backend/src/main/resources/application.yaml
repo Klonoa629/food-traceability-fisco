@@ -10,7 +10,6 @@ fisco:
 webase:
   sign-url: http://127.0.0.1:5004/WeBASE-Sign
   app-id: foodtrace
-  hello-address: "0xcceef68c9b4811b32c75df284a1396c7c5509561"
 
 foodtrace:
   contract-address: "0x2af6160e266f763652f433a80b94fc13f4065303"
@@ -23,4 +22,4 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://127.0.0.1:3306/foodtrace?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
-    password: "123456"
+    password: "${FOODTRACE_DB_PASSWORD}"

@@ -5,6 +5,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * 全局异常处理：统一把异常转换为 Result 响应
@@ -49,6 +50,20 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public Result<Void> handleUnreadable(HttpMessageNotReadableException e) {
         return Result.fail(400, "请求体格式错误或编码非 UTF-8");
+    }
+
+    /**
+     * 未知路径（无对应接口或静态资源）
+     *
+     * <p>Boot 3.2+ 对未匹配路径抛 NoResourceFoundException，
+     * 需在兜底分支前单独处理，否则会被包装成 500。
+     *
+     * @param e 静态资源未找到异常
+     * @return 404 与提示
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public Result<Void> handleNotFound(NoResourceFoundException e) {
+        return Result.fail(404, "接口不存在");
     }
 
     /**

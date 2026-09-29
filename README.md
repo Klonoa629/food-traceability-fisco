@@ -39,10 +39,10 @@ wsl.exe bash -c "mysql -uroot -p123456 foodtrace < /mnt/e/Study/Project/food-tra
 
 ```bash
 cd backend
-FOODTRACE_JWT_SECRET=<至少32字节的随机串> ./gradlew bootRun
+FOODTRACE_JWT_SECRET=<至少32字节的随机串> FOODTRACE_DB_PASSWORD=123456 ./gradlew bootRun
 ```
 
-密钥说明见 `backend/.env.example`。从 Windows 访问后端用
+两个环境变量的说明见 `backend/.env.example`。从 Windows 访问后端用
 `http://localhost:8081`，不要用 127.0.0.1——后端跑在 WSL 内时端口转发
 可能只绑 IPv6。
 
