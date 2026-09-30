@@ -13,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -139,5 +140,22 @@ class ProductServiceTest {
 
         assertThat(productService.list()).extracting(ProductVO::id)
                 .containsExactly(2L, 1L);
+    }
+
+    @Test
+    void stageOfRoleMappingShouldMatchContract() throws Exception {
+        // 钉死与合约 roleToStage 一致：合约映射变更时此测试必须同步修改
+        var field = ProductService.class.getDeclaredField("STAGE_OF_ROLE");
+        field.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        var mapping = (Map<Integer, Integer>) field.get(null);
+        assertThat(mapping).isEqualTo(Map.of(
+                1, 0, // 基地 -> 种植
+                2, 1, // 加工厂 -> 加工
+                3, 2, // 质检 -> 质检
+                4, 3, // 物流 -> 运输
+                5, 4, // 仓库 -> 仓储
+                6, 5  // 零售 -> 销售
+        ));
     }
 }
