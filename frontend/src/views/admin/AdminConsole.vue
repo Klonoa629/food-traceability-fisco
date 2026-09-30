@@ -83,6 +83,10 @@ async function revoke(u: UserInfo) {
 const logs = ref<OperateLog[]>([])
 const logsLoading = ref(false)
 const logFilter = reactive({ action: '', userId: undefined as number | undefined })
+// 分页状态
+const logPage = ref(1)
+const logSize = ref(20)
+const logTotal = ref(0)
 
 // 链上校验结果:记录 id -> 是否一致;false 即数据库疑似被篡改
 const verifyMap = ref<Record<string, boolean>>({})
@@ -94,14 +98,24 @@ const tamperedCount = computed(
 async function loadLogs() {
   logsLoading.value = true
   try {
-    logs.value = await adminLogs({
+    const result = await adminLogs({
       action: logFilter.action || undefined,
-      userId: logFilter.userId || undefined
+      userId: logFilter.userId || undefined,
+      page: logPage.value,
+      size: logSize.value
     })
+    logs.value = result.records
+    logTotal.value = result.total
     await verifyLogs()
   } finally {
     logsLoading.value = false
   }
+}
+
+// 筛选条件变化时回到第一页
+function resetLogPage() {
+  logPage.value = 1
+  loadLogs()
 }
 
 async function verifyLogs() {
@@ -284,11 +298,11 @@ async function logout() {
         <div class="ad-panel-head">
           <h3>操作审计</h3>
           <div class="ad-filters">
-            <el-select v-model="logFilter.action" placeholder="全部动作" clearable style="width: 160px" @change="loadLogs">
+            <el-select v-model="logFilter.action" placeholder="全部动作" clearable style="width: 160px" @change="resetLogPage">
               <el-option v-for="(name, a) in ACTION_NAMES" :key="a" :label="`${name}(${a})`" :value="a" />
             </el-select>
             <el-input-number v-model="logFilter.userId" placeholder="操作人 ID" :min="1" controls-position="right" style="width: 130px" />
-            <button class="ad-btn" @click="loadLogs">查询</button>
+            <button class="ad-btn" @click="resetLogPage">查询</button>
             <button class="ad-btn-ghost" :disabled="verifyLoading" @click="verifyLogs">
               {{ verifyLoading ? '校验中…' : '链上校验' }}
             </button>
@@ -333,6 +347,18 @@ async function logout() {
             <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
           </el-table-column>
         </el-table>
+
+        <el-pagination
+          class="log-pager"
+          background
+          layout="total, sizes, prev, pager, next"
+          :total="logTotal"
+          :page-sizes="[10, 20, 50, 100]"
+          v-model:current-page="logPage"
+          v-model:page-size="logSize"
+          @current-change="loadLogs"
+          @size-change="resetLogPage"
+        />
       </section>
 
       <section v-show="tab === 'recall'" class="ad-panel">
@@ -461,6 +487,7 @@ async function logout() {
 .admin-dark .ad-brand b { font-size: 17px; letter-spacing: 0.5px; }
 .admin-dark .spacer { flex: 1; }
 .admin-dark .ad-user { font-size: 14px; color: var(--ad-accent); }
+.admin-dark .log-pager { margin-top: 12px; justify-content: flex-end; }
 .admin-dark .ad-link { color: var(--ad-muted); text-decoration: none; font-size: 15px; padding: 5px 12px; border-radius: 6px; }
 .admin-dark .ad-link:hover { color: var(--ad-accent); }
 .admin-dark .ad-link.router-link-active { color: var(--ad-accent); background: rgba(110, 255, 160, 0.10); font-weight: 600; }

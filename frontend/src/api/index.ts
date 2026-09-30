@@ -1,6 +1,6 @@
 // 后端接口:认证、业务、监管三组
 import http, { unwrap } from './http'
-import type { LoginResponse, OperateLog, ProductVO, Result, UserInfo } from '../types'
+import type { LoginResponse, OperateLog, PageVO, ProductVO, Result, UserInfo } from '../types'
 
 // 认证
 export const login = (username: string, password: string) =>
@@ -49,8 +49,8 @@ export const adminApprove = (id: number, role: number) =>
 export const adminRevoke = (id: number) =>
   unwrap<unknown>(http.post<Result<unknown>>(`/admin/users/${id}/revoke`))
 
-export const adminLogs = (params: { action?: string; userId?: number }) =>
-  unwrap<OperateLog[]>(http.get<Result<OperateLog[]>>('/admin/logs', { params }))
+export const adminLogs = (params: { action?: string; userId?: number; page?: number; size?: number }) =>
+  unwrap<PageVO<OperateLog>>(http.get<Result<PageVO<OperateLog>>>('/admin/logs', { params }))
 
 export const adminRecall = (id: number, reason: string) =>
   unwrap<unknown>(http.post<Result<unknown>>(`/admin/products/${id}/recall`, { reason }))

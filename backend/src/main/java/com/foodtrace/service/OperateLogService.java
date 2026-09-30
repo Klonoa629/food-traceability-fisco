@@ -1,7 +1,9 @@
 package com.foodtrace.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.foodtrace.config.ContractProperties;
+import com.foodtrace.dto.PageVO;
 import com.foodtrace.entity.OperateLog;
 import com.foodtrace.entity.SysUser;
 import com.foodtrace.mapper.OperateLogMapper;
@@ -78,13 +80,15 @@ public class OperateLogService {
     }
 
     /**
-     * 分页无关的条件查询审计记录
+     * 条件分页查询审计记录
      *
      * @param action 操作类型（可空）
      * @param userId 操作账户 id（可空）
-     * @return 按时间倒序的审计记录列表
+     * @param page   页码（从 1 起）
+     * @param size   每页条数（1-100）
+     * @return 按时间倒序的分页结果
      */
-    public List<OperateLog> list(String action, Long userId) {
+    public PageVO<OperateLog> list(String action, Long userId, int page, int size) {
         LambdaQueryWrapper<OperateLog> wrapper = new LambdaQueryWrapper<>();
         if (action != null && !action.isBlank()) {
             wrapper.eq(OperateLog::getAction, action);
@@ -93,7 +97,10 @@ public class OperateLogService {
             wrapper.eq(OperateLog::getUserId, userId);
         }
         wrapper.orderByDesc(OperateLog::getId);
-        return operateLogMapper.selectList(wrapper);
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        return PageVO.of(operateLogMapper.selectPage(
+                new Page<>(safePage, safeSize), wrapper));
     }
 
     /**

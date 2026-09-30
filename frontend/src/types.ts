@@ -49,6 +49,14 @@ export interface Result<T> {
   data: T
 }
 
+// 分页结果
+export interface PageVO<T> {
+  records: T[]
+  total: number
+  page: number
+  size: number
+}
+
 export interface LoginResponse {
   token: string
   user: UserInfo

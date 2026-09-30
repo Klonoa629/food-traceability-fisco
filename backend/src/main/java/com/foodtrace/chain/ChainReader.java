@@ -28,6 +28,10 @@ import java.util.*;
  */
 @Component
 public class ChainReader {
+    /** 时间戳合理下限（2020-01-01 的毫秒值），低于即疑似单位回退为秒 */
+    private static final long MIN_TIMESTAMP_MS = 1_577_836_800_000L;
+    /** 时间戳合理上限（2100-01-01 的毫秒值） */
+    private static final long MAX_TIMESTAMP_MS = 4_102_444_800_000L;
     /** 交易组装器 */
     private final AssembleTransactionProcessor assembler;
     /** 占位密钥对的链上地址 */
@@ -132,7 +136,7 @@ public class ChainReader {
                     strOf(field(raw, 2, "operator")),
                     strOf(field(raw, 3, "location")),
                     strOf(field(raw, 4, "data_hash")),
-                    longOf(field(raw, 5, "timestamp"))));
+                    timestampOf(field(raw, 5, "timestamp"))));
         }
         return new ProductVO(
                 longOf(field(decoded, 0, "id")),
@@ -173,6 +177,21 @@ public class ChainReader {
             return number.longValue();
         }
         return Long.parseLong(String.valueOf(value));
+    }
+
+    /**
+     * 解析上链时间戳并校验单位合理区间（毫秒级 2020-2100）
+     *
+     * @param value 解码后的时间戳
+     * @return 毫秒时间戳
+     * @throws IllegalStateException 区间外抛出，提示疑似链或 SDK 时间戳单位变化
+     */
+    static long timestampOf(Object value) {
+        long timestamp = longOf(value);
+        if (timestamp < MIN_TIMESTAMP_MS || timestamp > MAX_TIMESTAMP_MS) {
+            throw new IllegalStateException("链上时间戳超出合理区间（疑似单位变化）：" + timestamp);
+        }
+        return timestamp;
     }
 
     private static String strOf(Object value) {

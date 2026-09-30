@@ -5,6 +5,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
@@ -50,6 +51,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public Result<Void> handleUnreadable(HttpMessageNotReadableException e) {
         return Result.fail(400, "请求体格式错误或编码非 UTF-8");
+    }
+
+    /**
+     * 链路异常（链读写失败或签名服务不可达），透出具体原因
+     *
+     * @param e 链路相关异常
+     * @return 502 与原因文本
+     */
+    @ExceptionHandler({IllegalStateException.class, RestClientException.class})
+    public Result<Void> handleChain(Exception e) {
+        return Result.fail(ErrorCode.CHAIN_REJECTED.getCode(), e.getMessage());
     }
 
     /**

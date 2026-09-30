@@ -2,6 +2,7 @@ package com.foodtrace.controller;
 
 import com.foodtrace.common.Result;
 import com.foodtrace.dto.ApproveRequest;
+import com.foodtrace.dto.PageVO;
 import com.foodtrace.dto.ProductVO;
 import com.foodtrace.dto.RecallRequest;
 import com.foodtrace.dto.UserInfo;
@@ -89,16 +90,20 @@ public class AdminController {
     }
 
     /**
-     * 查询操作审计记录
+     * 分页查询操作审计记录
      *
      * @param action 操作类型过滤（可空）
      * @param userId 操作账户 id 过滤（可空）
-     * @return 按时间倒序的审计记录列表
+     * @param page   页码，从 1 起
+     * @param size   每页条数
+     * @return 按时间倒序的分页审计记录
      */
     @GetMapping("/logs")
-    public Result<List<OperateLog>> listLogs(@RequestParam(required = false) String action,
-                                             @RequestParam(required = false) Long userId) {
-        return Result.ok(operateLogService.list(action, userId));
+    public Result<PageVO<OperateLog>> listLogs(@RequestParam(required = false) String action,
+                                               @RequestParam(required = false) Long userId,
+                                               @RequestParam(defaultValue = "1") int page,
+                                               @RequestParam(defaultValue = "20") int size) {
+        return Result.ok(operateLogService.list(action, userId, page, size));
     }
 
     /**
