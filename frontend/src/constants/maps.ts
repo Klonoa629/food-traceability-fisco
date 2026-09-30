@@ -40,13 +40,21 @@ export const ROLE_STAGE: Record<number, number> = {
 export const ACTION_NAMES: Record<string, string> = {
   REGISTER: '注册',
   LOGIN: '登录',
+  LOGIN_FAILED: '登录失败',
   APPROVE_USER: '审批账户',
+  APPROVE_USER_FAILED: '审批账户失败',
   REVOKE_USER: '吊销账户',
+  REVOKE_USER_FAILED: '吊销账户失败',
   REGISTER_PRODUCT: '注册产品',
+  REGISTER_PRODUCT_FAILED: '注册产品失败',
   ADD_RECORD: '环节记录',
+  ADD_RECORD_FAILED: '环节记录失败',
   HANDOVER: '交接',
+  HANDOVER_FAILED: '交接失败',
   INSPECT: '质检',
-  RECALL: '召回'
+  INSPECT_FAILED: '质检失败',
+  RECALL: '召回',
+  RECALL_FAILED: '召回失败'
 }
 
 export function shortAddr(addr?: string | null): string {

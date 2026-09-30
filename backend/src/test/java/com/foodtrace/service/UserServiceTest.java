@@ -26,9 +26,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-
-/**
+import static org.mockito.Mockito.*;/**
  * 账户服务单元测试：登录状态校验与审批/吊销流程
  *
  * @author Microft0629
@@ -100,6 +98,8 @@ class UserServiceTest {
                 .isInstanceOf(BizException.class)
                 .extracting(e -> ((BizException) e).getCode())
                 .isEqualTo(ErrorCode.UNAUTHORIZED.getCode());
+        verify(operateLogService).record(eq(2L), eq("farm_a"),
+                eq("LOGIN_FAILED"), isNull(), isNull(), eq("用户名或密码错误"));
     }
 
     @Test
@@ -138,6 +138,8 @@ class UserServiceTest {
                 .isInstanceOf(BizException.class)
                 .extracting(e -> ((BizException) e).getCode())
                 .isEqualTo(ErrorCode.INVALID_STATE.getCode());
+        verify(operateLogService).record(eq(1L), eq("regulator"),
+                eq("APPROVE_USER_FAILED"), eq(2L), isNull(), anyString());
     }
 
     @Test

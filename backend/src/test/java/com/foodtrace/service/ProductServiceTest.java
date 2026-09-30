@@ -84,12 +84,14 @@ class ProductServiceTest {
 
     @Test
     void addRecordShouldRejectStageRoleMismatch() {
-        // 基地角色只能写种植环节（0），写运输环节（3）应被拒绝
+        // 基地角色只能写种植环节（0），写运输环节（3）应被拒绝并落失败审计
         assertThatThrownBy(() -> productService.addRecord(1,
                 new AddRecordRequest(3, "运输中", "昆明", null), farm))
                 .isInstanceOf(BizException.class)
                 .extracting(e -> ((BizException) e).getCode())
                 .isEqualTo(ErrorCode.FORBIDDEN.getCode());
+        verify(operateLogService).record(eq(2L), eq("farm_a"),
+                eq("ADD_RECORD_FAILED"), eq(1L), isNull(), eq("环节与机构角色不符"));
     }
 
     @Test

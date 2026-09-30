@@ -20,7 +20,8 @@ import java.util.Map;
  * 产品溯源业务服务
  *
  * <p>在链上交易前做本地前置校验（角色匹配等）以快速失败，
- * 上链成功后回读产品并落审计；哈希字段缺省时由后端对业务内容计算 SHA-256。
+ * 上链成功后回读产品并落审计；操作被拒绝时以 <code>动作_FAILED</code>
+ * 落失败审计（含拒绝原因）；哈希字段缺省时由后端对业务内容计算 SHA-256。
  *
  * @author Microft0629
  * @since 2026-09-18
@@ -56,6 +57,16 @@ public class ProductService {
      * @throws BizException 非基地角色或上链失败时抛出
      */
     public ProductVO register(RegisterProductRequest request, LoginUser user) {
+        try {
+            return doRegister(request, user);
+        } catch (BizException e) {
+            operateLogService.record(user.id(), user.username(),
+                    "REGISTER_PRODUCT_FAILED", null, null, e.getMessage());
+            throw e;
+        }
+    }
+
+    private ProductVO doRegister(RegisterProductRequest request, LoginUser user) {
         requireChainIdentity(user);
         requireRole(user, 1, "仅基地机构可注册产品");
         String dataHash = orSha256(request.dataHash(),
@@ -78,6 +89,15 @@ public class ProductService {
      * @throws BizException 角色不符、越权或上链失败时抛出
      */
     public ProductVO addRecord(long productId, AddRecordRequest request, LoginUser user) {
+        try {
+            return doAddRecord(productId, request, user);
+        } catch (BizException e) {
+            audit(user, "ADD_RECORD_FAILED", productId, null, e.getMessage());
+            throw e;
+        }
+    }
+
+    private ProductVO doAddRecord(long productId, AddRecordRequest request, LoginUser user) {
         requireChainIdentity(user);
         requireStageMatchesRole(user, request.stage());
         String dataHash = orSha256(request.dataHash(),
@@ -99,6 +119,15 @@ public class ProductService {
      * @throws BizException 越权或上链失败时抛出
      */
     public ProductVO handOver(long productId, HandoverRequest request, LoginUser user) {
+        try {
+            return doHandOver(productId, request, user);
+        } catch (BizException e) {
+            audit(user, "HANDOVER_FAILED", productId, null, e.getMessage());
+            throw e;
+        }
+    }
+
+    private ProductVO doHandOver(long productId, HandoverRequest request, LoginUser user) {
         requireChainIdentity(user);
         String txHash = chainProductService.handOver(user.signUserId(), productId, request.nextHolder());
         audit(user, "HANDOVER", productId, txHash, "交接至 " + request.nextHolder());
@@ -115,6 +144,15 @@ public class ProductService {
      * @throws BizException 非质检机构或上链失败时抛出
      */
     public ProductVO inspect(long productId, InspectRequest request, LoginUser user) {
+        try {
+            return doInspect(productId, request, user);
+        } catch (BizException e) {
+            audit(user, "INSPECT_FAILED", productId, null, e.getMessage());
+            throw e;
+        }
+    }
+
+    private ProductVO doInspect(long productId, InspectRequest request, LoginUser user) {
         requireChainIdentity(user);
         requireRole(user, 3, "仅质检机构可执行质检");
         String reportHash = orSha256(request.reportHash(), productId + "|" + request.qualified());
@@ -135,6 +173,15 @@ public class ProductService {
      * @throws BizException 非监管账户或上链失败时抛出
      */
     public ProductVO recall(long productId, RecallRequest request, LoginUser operator) {
+        try {
+            return doRecall(productId, request, operator);
+        } catch (BizException e) {
+            audit(operator, "RECALL_FAILED", productId, null, e.getMessage());
+            throw e;
+        }
+    }
+
+    private ProductVO doRecall(long productId, RecallRequest request, LoginUser operator) {
         if (!operator.regulator() || operator.signUserId() == null) {
             throw new BizException(ErrorCode.FORBIDDEN, "仅监管机构可召回产品");
         }

@@ -21,7 +21,7 @@ import java.util.List;
  * 平台账户服务
  *
  * <p>覆盖注册（待审批）→ 登录（JWT）→ 监管审批（Sign 开户 + 链上发角色）→ 吊销
- * （链上收角色）的完整账户生命周期，关键动作均落审计。
+ * （链上收角色）的完整账户生命周期，成功与失败动作均落审计。
  *
  * @author Microft0629
  * @since 2026-09-17
@@ -93,6 +93,17 @@ public class UserService {
      */
     public LoginResponse login(LoginRequest request) {
         SysUser user = findByUsername(request.username());
+        try {
+            return doLogin(user, request);
+        } catch (BizException e) {
+            // 用户名不存在时无账户 id，以 0 占位
+            operateLogService.record(user == null ? 0L : user.getId(), request.username(),
+                    "LOGIN_FAILED", null, null, e.getMessage());
+            throw e;
+        }
+    }
+
+    private LoginResponse doLogin(SysUser user, LoginRequest request) {
         if (user == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw new BizException(ErrorCode.UNAUTHORIZED, "用户名或密码错误");
         }
@@ -145,6 +156,16 @@ public class UserService {
      * @throws BizException 账户不存在、状态不符、开户或上链失败时抛出
      */
     public UserInfo approve(Long id, int role, LoginUser operator) {
+        try {
+            return doApprove(id, role, operator);
+        } catch (BizException e) {
+            operateLogService.record(operator.id(), operator.username(),
+                    "APPROVE_USER_FAILED", id, null, e.getMessage());
+            throw e;
+        }
+    }
+
+    private UserInfo doApprove(Long id, int role, LoginUser operator) {
         SysUser user = requireUser(id);
         if (user.getStatus() != 0) {
             throw new BizException(ErrorCode.INVALID_STATE, "仅待审批账户可通过审批");
@@ -186,6 +207,16 @@ public class UserService {
         if (id.equals(operator.id())) {
             throw new BizException(ErrorCode.PARAM_ERROR, "不能吊销当前登录账户");
         }
+        try {
+            return doRevoke(id, operator);
+        } catch (BizException e) {
+            operateLogService.record(operator.id(), operator.username(),
+                    "REVOKE_USER_FAILED", id, null, e.getMessage());
+            throw e;
+        }
+    }
+
+    private UserInfo doRevoke(Long id, LoginUser operator) {
         SysUser user = requireUser(id);
         if (user.getStatus() != 1) {
             throw new BizException(ErrorCode.INVALID_STATE, "仅生效账户可吊销");
