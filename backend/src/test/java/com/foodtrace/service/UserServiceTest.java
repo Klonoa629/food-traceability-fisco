@@ -13,6 +13,7 @@ import com.foodtrace.entity.SysUser;
 import com.foodtrace.mapper.SysUserMapper;
 import com.foodtrace.security.JwtUtil;
 import com.foodtrace.security.LoginUser;
+import com.foodtrace.security.RateLimitService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,6 +49,8 @@ class UserServiceTest {
     private JwtUtil jwtUtil;
     @Mock
     private ProductService productService;
+    @Mock
+    private RateLimitService rateLimitService;
 
     private UserService userService;
 
@@ -61,7 +64,8 @@ class UserServiceTest {
     @BeforeEach
     void setUp() {
         userService = new UserService(userMapper, operateLogService, passwordEncoder,
-                jwtUtil, signClient, chainRoleService, chainReader, productService);
+                jwtUtil, signClient, chainRoleService, chainReader, productService,
+                rateLimitService);
     }
 
     /**
@@ -100,6 +104,20 @@ class UserServiceTest {
                 .isEqualTo(ErrorCode.UNAUTHORIZED.getCode());
         verify(operateLogService).record(eq(2L), eq("farm_a"),
                 eq("LOGIN_FAILED"), isNull(), isNull(), eq("用户名或密码错误"));
+        verify(rateLimitService).recordLoginFailure("farm_a");
+    }
+
+    @Test
+    void loginShouldRejectWhenRateLimited() {
+        doThrow(new BizException(ErrorCode.TOO_MANY_REQUESTS))
+                .when(rateLimitService).checkLoginBlocked("farm_a");
+
+        assertThatThrownBy(() -> userService.login(new LoginRequest("farm_a", "any")))
+                .isInstanceOf(BizException.class)
+                .extracting(e -> ((BizException) e).getCode())
+                .isEqualTo(ErrorCode.TOO_MANY_REQUESTS.getCode());
+        // 被锁定时不应再查库
+        verify(userMapper, never()).selectOne(any());
     }
 
     @Test

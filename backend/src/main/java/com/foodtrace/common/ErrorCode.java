@@ -18,6 +18,8 @@ public enum ErrorCode {
     NOT_FOUND(404, "资源不存在"),
     /** 状态不允许该操作 */
     INVALID_STATE(409, "状态不允许该操作"),
+    /** 请求过于频繁 */
+    TOO_MANY_REQUESTS(429, "请求过于频繁"),
     /** 参数错误 */
     PARAM_ERROR(400, "参数错误"),
     /** 链上交易被拒绝 */

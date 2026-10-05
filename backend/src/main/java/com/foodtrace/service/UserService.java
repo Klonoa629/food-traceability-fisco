@@ -11,6 +11,7 @@ import com.foodtrace.entity.SysUser;
 import com.foodtrace.mapper.SysUserMapper;
 import com.foodtrace.security.JwtUtil;
 import com.foodtrace.security.LoginUser;
+import com.foodtrace.security.RateLimitService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -48,6 +49,8 @@ public class UserService {
     private final ChainReader chainReader;
     /** 产品业务服务 */
     private final ProductService productService;
+    /** 限流服务 */
+    private final RateLimitService rateLimitService;
 
     /**
      * 按登录名查询账户（认证过滤器使用）
@@ -92,10 +95,15 @@ public class UserService {
      * @throws BizException 凭据错误、待审批或已吊销时抛出
      */
     public LoginResponse login(LoginRequest request) {
+        // 失败锁定检查前置，被锁定时不消耗数据库与审计资源
+        rateLimitService.checkLoginBlocked(request.username());
         SysUser user = findByUsername(request.username());
         try {
-            return doLogin(user, request);
+            LoginResponse response = doLogin(user, request);
+            rateLimitService.recordLoginSuccess(request.username());
+            return response;
         } catch (BizException e) {
+            rateLimitService.recordLoginFailure(request.username());
             // 用户名不存在时无账户 id，以 0 占位
             operateLogService.record(user == null ? 0L : user.getId(), request.username(),
                     "LOGIN_FAILED", null, null, e.getMessage());

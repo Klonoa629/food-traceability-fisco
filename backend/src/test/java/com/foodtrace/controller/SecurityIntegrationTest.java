@@ -4,11 +4,13 @@ import com.foodtrace.chain.ChainReader;
 import com.foodtrace.config.ContractProperties;
 import com.foodtrace.config.SecurityConfig;
 import com.foodtrace.dto.LoginResponse;
+import com.foodtrace.dto.ProductVO;
 import com.foodtrace.dto.UserInfo;
 import com.foodtrace.entity.SysUser;
 import com.foodtrace.security.JwtAuthenticationFilter;
 import com.foodtrace.security.JwtUtil;
 import com.foodtrace.security.LoginUser;
+import com.foodtrace.security.RateLimitService;
 import com.foodtrace.service.OperateLogService;
 import com.foodtrace.service.ProductService;
 import com.foodtrace.service.UserService;
@@ -41,7 +43,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @since 2026-09-30
  */
 @WebMvcTest
-@Import({SecurityConfig.class, JwtAuthenticationFilter.class, JwtUtil.class, ContractProperties.class})
+@Import({SecurityConfig.class, JwtAuthenticationFilter.class, JwtUtil.class,
+        ContractProperties.class, RateLimitService.class})
 @TestPropertySource(properties = {
         "foodtrace.jwt.secret=test-secret-0123456789abcdef0123456789abcdef",
         "foodtrace.jwt.ttl-minutes=120"})
@@ -185,5 +188,22 @@ class SecurityIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(404))
                 .andExpect(jsonPath("$.message").value("接口不存在"));
+    }
+
+    @Test
+    void publicTraceShouldRateLimitPerIp() throws Exception {
+        when(chainReader.productByBatch(anyString())).thenReturn(new ProductVO(
+                1L, "草莓", "B1", "0xf", "0xf", 0, false, List.of()));
+        // 前 30 次放行
+        for (int i = 0; i < 30; i++) {
+            mockMvc.perform(get("/api/public/trace").param("batchNo", "B1"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(0));
+        }
+        // 第 31 次触发限流
+        mockMvc.perform(get("/api/public/trace").param("batchNo", "B1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(429))
+                .andExpect(jsonPath("$.message").value("请求过于频繁，请稍后再试"));
     }
 }
