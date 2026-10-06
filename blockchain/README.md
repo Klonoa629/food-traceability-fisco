@@ -14,7 +14,7 @@
 
 ## 测试
 
-需要 Node.js 18 以上：
+需要 Node.js 22.13 以上（Hardhat 3 的要求）：
 
     npm install
     npm run compile
