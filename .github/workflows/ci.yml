@@ -25,6 +25,8 @@ jobs:
           cache: npm
           cache-dependency-path: blockchain/package-lock.json
       - run: npm ci
+      # types/artifacts 不入库，测试前需编译生成 TypeChain 类型
+      - run: npm run compile
       - run: npm test
 
   backend:
