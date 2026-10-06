@@ -13,6 +13,8 @@ webase:
 
 foodtrace:
   contract-address: "0x2af6160e266f763652f433a80b94fc13f4065303"
+  # 角色对账周期（毫秒），默认 10 分钟
+  reconcile-interval-ms: 600000
   jwt:
     secret: "${FOODTRACE_JWT_SECRET}"
     ttl-minutes: 120

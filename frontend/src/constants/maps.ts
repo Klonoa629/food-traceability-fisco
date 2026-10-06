@@ -54,7 +54,8 @@ export const ACTION_NAMES: Record<string, string> = {
   INSPECT: '质检',
   INSPECT_FAILED: '质检失败',
   RECALL: '召回',
-  RECALL_FAILED: '召回失败'
+  RECALL_FAILED: '召回失败',
+  ROLE_MISMATCH: '角色不一致'
 }
 
 export function shortAddr(addr?: string | null): string {
