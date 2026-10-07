@@ -1,6 +1,6 @@
 package com.foodtrace.controller;
 
-import com.foodtrace.chain.ChainReader;
+import com.foodtrace.chain.ProductCache;
 import com.foodtrace.config.ContractProperties;
 import com.foodtrace.config.SecurityConfig;
 import com.foodtrace.dto.LoginResponse;
@@ -65,7 +65,7 @@ class SecurityIntegrationTest {
     @MockitoBean
     private Client client;
     @MockitoBean
-    private ChainReader chainReader;
+    private ProductCache productCache;
 
     /**
      * 构造指定身份与状态的账户实体
@@ -192,7 +192,7 @@ class SecurityIntegrationTest {
 
     @Test
     void publicTraceShouldRateLimitPerIp() throws Exception {
-        when(chainReader.productByBatch(anyString())).thenReturn(new ProductVO(
+        when(productCache.getByBatch(anyString())).thenReturn(new ProductVO(
                 1L, "草莓", "B1", "0xf", "0xf", 0, false, List.of()));
         // 前 30 次放行
         for (int i = 0; i < 30; i++) {

@@ -2,6 +2,7 @@ package com.foodtrace.service;
 
 import com.foodtrace.chain.ChainProductService;
 import com.foodtrace.chain.ChainReader;
+import com.foodtrace.chain.ProductCache;
 import com.foodtrace.common.BizException;
 import com.foodtrace.common.ErrorCode;
 import com.foodtrace.dto.*;
@@ -45,6 +46,8 @@ public class ProductService {
     private final ChainProductService chainProductService;
     /** 链上只读查询 */
     private final ChainReader chainReader;
+    /** 产品读缓存 */
+    private final ProductCache productCache;
     /** 审计服务 */
     private final OperateLogService operateLogService;
 
@@ -73,7 +76,8 @@ public class ProductService {
                 request.name() + "|" + request.batchNo() + "|" + request.description() + "|" + request.location());
         String txHash = chainProductService.registerProduct(user.signUserId(), request.name(),
                 request.batchNo(), request.description(), request.location(), dataHash);
-        ProductVO product = chainReader.productByBatch(request.batchNo());
+        // 新批次未缓存，回读即回源并顺带入缓存
+        ProductVO product = productCache.getByBatch(request.batchNo());
         audit(user, "REGISTER_PRODUCT", product.id(), txHash,
                 "注册产品 " + request.name() + "，批次 " + request.batchNo());
         return product;
@@ -106,7 +110,7 @@ public class ProductService {
                 request.description(), request.location(), dataHash);
         audit(user, "ADD_RECORD", productId, txHash,
                 "添加环节记录 " + request.stage() + "：" + request.description());
-        return chainReader.product(productId);
+        return refresh(productId);
     }
 
     /**
@@ -131,7 +135,7 @@ public class ProductService {
         requireChainIdentity(user);
         String txHash = chainProductService.handOver(user.signUserId(), productId, request.nextHolder());
         audit(user, "HANDOVER", productId, txHash, "交接至 " + request.nextHolder());
-        return chainReader.product(productId);
+        return refresh(productId);
     }
 
     /**
@@ -160,7 +164,7 @@ public class ProductService {
                 reportHash, request.qualified());
         audit(user, "INSPECT", productId, txHash,
                 "质检" + (request.qualified() ? "合格" : "不合格"));
-        return chainReader.product(productId);
+        return refresh(productId);
     }
 
     /**
@@ -188,7 +192,7 @@ public class ProductService {
         String reasonHash = orSha256(request.reasonHash(), productId + "|" + request.reason());
         String txHash = chainProductService.recallProduct(operator.signUserId(), productId, reasonHash);
         audit(operator, "RECALL", productId, txHash, "召回原因：" + request.reason());
-        return chainReader.product(productId);
+        return refresh(productId);
     }
 
     /**
@@ -202,7 +206,7 @@ public class ProductService {
         if (productId < 1 || productId > chainReader.productCount()) {
             throw new BizException(ErrorCode.NOT_FOUND, "产品不存在");
         }
-        return chainReader.product(productId);
+        return productCache.get(productId);
     }
 
     /**
@@ -213,13 +217,15 @@ public class ProductService {
     public List<ProductVO> list() {
         List<ProductVO> products = new ArrayList<>();
         for (long id = chainReader.productCount(); id >= 1; id--) {
-            products.add(chainReader.product(id));
+            products.add(productCache.get(id));
         }
         return products;
     }
 
     /**
      * 查询机构名下仍在流转中的产品（未到销售/召回终态）
+     *
+     * <p>直查链上不走缓存：结果用于吊销守卫，须取最新状态。
      *
      * @param chainAddress 机构链上地址
      * @return 在途产品列表，新的在前
@@ -234,6 +240,17 @@ public class ProductService {
             }
         }
         return products;
+    }
+
+    /**
+     * 写路径回读：失效缓存后回源取最新状态并重新入缓存
+     *
+     * @param productId 产品 id
+     * @return 链上最新产品视图
+     */
+    private ProductVO refresh(long productId) {
+        productCache.evict(productId);
+        return productCache.get(productId);
     }
 
     /**

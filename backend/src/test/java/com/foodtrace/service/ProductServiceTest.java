@@ -2,6 +2,7 @@ package com.foodtrace.service;
 
 import com.foodtrace.chain.ChainProductService;
 import com.foodtrace.chain.ChainReader;
+import com.foodtrace.chain.ProductCache;
 import com.foodtrace.common.BizException;
 import com.foodtrace.common.ErrorCode;
 import com.foodtrace.dto.*;
@@ -33,6 +34,8 @@ class ProductServiceTest {
     @Mock
     private ChainReader chainReader;
     @Mock
+    private ProductCache productCache;
+    @Mock
     private OperateLogService operateLogService;
 
     private ProductService productService;
@@ -49,7 +52,8 @@ class ProductServiceTest {
      */
     @BeforeEach
     void setUp() {
-        productService = new ProductService(chainProductService, chainReader, operateLogService);
+        productService = new ProductService(chainProductService, chainReader,
+                productCache, operateLogService);
     }
 
     /**
@@ -72,7 +76,7 @@ class ProductServiceTest {
     void registerShouldReturnOnChainProductAndAudit() {
         when(chainProductService.registerProduct(eq("ft_farm_a"), anyString(), anyString(),
                 anyString(), anyString(), anyString())).thenReturn("0xtx");
-        when(chainReader.productByBatch("B1")).thenReturn(product(1, 0));
+        when(productCache.getByBatch("B1")).thenReturn(product(1, 0));
 
         ProductVO result = productService.register(
                 new RegisterProductRequest("阳光草莓", "B1", "首批种植", "云南昆明", null), farm);
@@ -135,8 +139,8 @@ class ProductServiceTest {
     @Test
     void listShouldReturnNewestFirst() {
         when(chainReader.productCount()).thenReturn(2L);
-        when(chainReader.product(1L)).thenReturn(product(1, 0));
-        when(chainReader.product(2L)).thenReturn(product(2, 2));
+        when(productCache.get(1L)).thenReturn(product(1, 0));
+        when(productCache.get(2L)).thenReturn(product(2, 2));
 
         assertThat(productService.list()).extracting(ProductVO::id)
                 .containsExactly(2L, 1L);

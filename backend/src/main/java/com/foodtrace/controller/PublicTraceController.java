@@ -1,6 +1,6 @@
 package com.foodtrace.controller;
 
-import com.foodtrace.chain.ChainReader;
+import com.foodtrace.chain.ProductCache;
 import com.foodtrace.common.BizException;
 import com.foodtrace.common.ErrorCode;
 import com.foodtrace.common.Result;
@@ -25,8 +25,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/public")
 @RequiredArgsConstructor
 public class PublicTraceController {
-    /** 链上只读查询 */
-    private final ChainReader chainReader;
+    /** 链上产品读缓存 */
+    private final ProductCache productCache;
     /** 限流服务 */
     private final RateLimitService rateLimitService;
 
@@ -44,7 +44,7 @@ public class PublicTraceController {
             throw new BizException(ErrorCode.PARAM_ERROR, "批次号不能为空");
         }
         try {
-            return Result.ok(chainReader.productByBatch(batchNo.trim()));
+            return Result.ok(productCache.getByBatch(batchNo.trim()));
         } catch (IllegalStateException e) {
             throw new BizException(ErrorCode.NOT_FOUND, "未找到该批次号对应的产品");
         }
