@@ -5,10 +5,10 @@ server:
 fisco:
   cert-path: conf
   group-id: group0
-  peers: 127.0.0.1:20200
+  peers: ${FISCO_PEERS:127.0.0.1:20200}
 
 webase:
-  sign-url: http://127.0.0.1:5004/WeBASE-Sign
+  sign-url: ${WEBASE_SIGN_URL:http://127.0.0.1:5004/WeBASE-Sign}
   app-id: foodtrace
 
 foodtrace:
@@ -24,6 +24,6 @@ foodtrace:
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://127.0.0.1:3306/foodtrace?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/foodtrace?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
     password: "${FOODTRACE_DB_PASSWORD}"

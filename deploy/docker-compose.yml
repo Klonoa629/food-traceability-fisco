@@ -1,0 +1,21 @@
+services:
+  backend:
+    build: ../backend
+    environment:
+      FOODTRACE_JWT_SECRET: ${FOODTRACE_JWT_SECRET}
+      FOODTRACE_DB_PASSWORD: ${FOODTRACE_DB_PASSWORD}
+      DB_HOST: ${DB_HOST:-host.docker.internal}
+      WEBASE_SIGN_URL: ${WEBASE_SIGN_URL:-http://host.docker.internal:5004/WeBASE-Sign}
+      FISCO_PEERS: ${FISCO_PEERS:-host.docker.internal:20200}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  web:
+    build: ../frontend
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/nginx/certs
+    depends_on:
+      - backend

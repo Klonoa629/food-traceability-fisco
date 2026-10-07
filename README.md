@@ -57,6 +57,15 @@ npm run dev
 浏览器打开 `http://localhost:5173`，`/api` 已由 Vite 代理到后端，无需
 处理跨域。
 
+## 容器化部署
+
+前后端可打包为容器一键起（nginx 统一入口，TLS 可选），链环境仍在
+WSL 不进容器，见 [deploy/README.md](deploy/README.md)：
+
+```bash
+cd deploy && cp .env.example .env && docker compose up -d --build
+```
+
 ## 演示账号
 
 | 用户名 | 密码 | 身份 |
