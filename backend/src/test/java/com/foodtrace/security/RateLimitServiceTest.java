@@ -2,6 +2,7 @@ package com.foodtrace.security;
 
 import com.foodtrace.common.BizException;
 import com.foodtrace.common.ErrorCode;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -27,7 +28,7 @@ class RateLimitServiceTest {
      */
     @BeforeEach
     void setUp() {
-        service = new RateLimitService(now::get);
+        service = new RateLimitService(now::get, new SimpleMeterRegistry());
     }
 
     /**

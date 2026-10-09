@@ -39,6 +39,8 @@ public class SecurityConfig {
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
+                        // 探针供容器编排使用；指标仅内网可达（容器未发布端口，nginx 不代理）
+                        .requestMatchers("/actuator/health/**", "/actuator/prometheus").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("REGULATOR")
                         .anyRequest().authenticated())
                 .exceptionHandling(e -> e

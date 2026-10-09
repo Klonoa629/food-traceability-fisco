@@ -2,7 +2,9 @@ package com.foodtrace.security;
 
 import com.foodtrace.common.BizException;
 import com.foodtrace.common.ErrorCode;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -35,25 +37,32 @@ public class RateLimitService {
 
     /** 当前时间毫秒源（可注入便于测试） */
     private final LongSupplier clock;
+    /** 指标注册表 */
+    private final MeterRegistry meterRegistry;
     /** 登录名 -> 失败统计 */
     private final Map<String, FailureWindow> loginFailures = new ConcurrentHashMap<>();
     /** 范围:IP -> 请求计数 */
     private final Map<String, CountWindow> ipWindows = new ConcurrentHashMap<>();
 
     /**
-     * 默认以系统时钟构造
+     * 以系统时钟与指标注册表构造
+     *
+     * @param meterRegistry 指标注册表
      */
-    public RateLimitService() {
-        this(System::currentTimeMillis);
+    @Autowired
+    public RateLimitService(MeterRegistry meterRegistry) {
+        this(System::currentTimeMillis, meterRegistry);
     }
 
     /**
      * 以指定时钟构造（测试用）
      *
-     * @param clock 时间毫秒源
+     * @param clock          时间毫秒源
+     * @param meterRegistry  指标注册表
      */
-    RateLimitService(LongSupplier clock) {
+    RateLimitService(LongSupplier clock, MeterRegistry meterRegistry) {
         this.clock = clock;
+        this.meterRegistry = meterRegistry;
     }
 
     /**
@@ -66,6 +75,7 @@ public class RateLimitService {
         FailureWindow window = loginFailures.get(username);
         if (window != null && window.failures.get() >= MAX_LOGIN_FAILURES
                 && clock.getAsLong() - window.sinceMs < LOGIN_WINDOW_MS) {
+            meterRegistry.counter("ratelimit.blocked", "scope", "login").increment();
             throw new BizException(ErrorCode.TOO_MANY_REQUESTS,
                     "登录失败次数过多，请 10 分钟后再试");
         }
@@ -117,6 +127,7 @@ public class RateLimitService {
             return window;
         });
         if (ipWindows.get(key).count.get() > limit) {
+            meterRegistry.counter("ratelimit.blocked", "scope", scope).increment();
             throw new BizException(ErrorCode.TOO_MANY_REQUESTS,
                     "请求过于频繁，请稍后再试");
         }

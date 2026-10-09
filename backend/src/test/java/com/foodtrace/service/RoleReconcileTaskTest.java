@@ -3,6 +3,7 @@ package com.foodtrace.service;
 import com.foodtrace.chain.ChainReader;
 import com.foodtrace.entity.SysUser;
 import com.foodtrace.mapper.SysUserMapper;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,7 +42,8 @@ class RoleReconcileTaskTest {
      */
     @BeforeEach
     void setUp() {
-        task = new RoleReconcileTask(userMapper, operateLogService, chainReader);
+        task = new RoleReconcileTask(userMapper, operateLogService, chainReader,
+                new SimpleMeterRegistry());
     }
 
     /**

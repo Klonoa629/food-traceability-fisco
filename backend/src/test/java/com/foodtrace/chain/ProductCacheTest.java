@@ -1,6 +1,7 @@
 package com.foodtrace.chain;
 
 import com.foodtrace.dto.ProductVO;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,7 +35,7 @@ class ProductCacheTest {
      */
     @BeforeEach
     void setUp() {
-        cache = new ProductCache(chainReader, 60_000L, now::get);
+        cache = new ProductCache(chainReader, 60_000L, now::get, new SimpleMeterRegistry());
     }
 
     /**

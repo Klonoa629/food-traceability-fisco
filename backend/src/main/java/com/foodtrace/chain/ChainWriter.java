@@ -9,6 +9,8 @@ import org.fisco.bcos.sdk.v3.model.CryptoType;
 import org.fisco.bcos.sdk.v3.model.TransactionReceipt;
 import org.fisco.bcos.sdk.v3.transaction.codec.encode.TransactionEncoderService;
 import org.fisco.bcos.sdk.v3.transaction.manager.AssembleTransactionProcessor;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.fisco.bcos.sdk.v3.utils.Hex;
 import org.fisco.bcos.sdk.v3.utils.Numeric;
 import org.slf4j.Logger;
@@ -38,9 +40,12 @@ public class ChainWriter {
     private final RemoteSignProvider signProvider;
     /** WeBASE-Sign 客户端 */
     private final SignClient signClient;
+    /** 指标注册表 */
+    private final MeterRegistry meterRegistry;
 
     public ChainWriter(BcosSDK bcosSDK, Client client, RemoteSignProvider signProvider,
-                       SignClient signClient, @Value("${fisco.group-id}") String groupId) {
+                       SignClient signClient, @Value("${fisco.group-id}") String groupId,
+                       MeterRegistry meterRegistry) {
         this.client = client;
         this.cryptoSuite = new CryptoSuite(CryptoType.ECDSA_TYPE, bcosSDK.getConfig());
         this.encoder = new TransactionEncoderService(cryptoSuite);
@@ -50,6 +55,7 @@ public class ChainWriter {
                 client.getGroupInfo().getResult().getChainID(), "", "", "");
         this.signProvider = signProvider;
         this.signClient = signClient;
+        this.meterRegistry = meterRegistry;
     }
 
     /**
@@ -66,6 +72,8 @@ public class ChainWriter {
     public TransactionReceipt send(String signUserId, String contractAddress,
                                    String abi, String method, List<Object> args) {
         signProvider.setCurrentUser(signUserId);
+        Timer.Sample sample = Timer.start(meterRegistry);
+        String outcome = "success";
         try {
             // 组装交易
             long handle = assembler.getRawTransaction(contractAddress, abi, method, args);
@@ -89,8 +97,12 @@ public class ChainWriter {
                     receipt.getTransactionHash(), receipt.getStatus());
             return receipt;
         } catch (Exception e) {
+            outcome = "error";
             throw new IllegalStateException("写链失败: " + e.getMessage(), e);
         } finally {
+            sample.stop(Timer.builder("chain.write")
+                    .tag("outcome", outcome)
+                    .register(meterRegistry));
             signProvider.clearCurrentUser();
         }
     }

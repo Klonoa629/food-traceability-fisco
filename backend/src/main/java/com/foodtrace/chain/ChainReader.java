@@ -3,6 +3,8 @@ package com.foodtrace.chain;
 import com.foodtrace.config.ContractProperties;
 import com.foodtrace.dto.ProductVO;
 import com.foodtrace.dto.TraceRecordVO;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.fisco.bcos.sdk.v3.codec.ContractCodecException;
 import org.fisco.bcos.sdk.v3.crypto.keypair.CryptoKeyPair;
 import org.fisco.bcos.sdk.v3.transaction.model.exception.TransactionBaseException;
@@ -17,6 +19,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigInteger;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 链上只读查询封装
@@ -40,6 +43,8 @@ public class ChainReader {
     private final String contractAddress;
     /** Foodtrace 合约 ABI */
     private final String abi;
+    /** 指标注册表 */
+    private final MeterRegistry meterRegistry;
 
     /**
      * 组装只读查询组件
@@ -49,10 +54,12 @@ public class ChainReader {
      * @param groupId            群组 ID
      * @param contractProperties 合约连接配置
      * @param abiHolder          ABI 资源持有者
+     * @param meterRegistry      指标注册表
      */
     public ChainReader(BcosSDK bcosSDK, Client client,
                        @Value("${fisco.group-id}") String groupId,
-                       ContractProperties contractProperties, AbiHolder abiHolder) {
+                       ContractProperties contractProperties, AbiHolder abiHolder,
+                       MeterRegistry meterRegistry) {
         CryptoSuite cryptoSuite = new CryptoSuite(CryptoType.ECDSA_TYPE, bcosSDK.getConfig());
         // 占位密钥对：view 调用不签名，from 地址仅作占位
         CryptoKeyPair keyPair = cryptoSuite.generateRandomKeyPair();
@@ -61,6 +68,7 @@ public class ChainReader {
         this.fromAddress = keyPair.getAddress();
         this.contractAddress = contractProperties.getContractAddress();
         this.abi = abiHolder.get();
+        this.meterRegistry = meterRegistry;
     }
 
     /**
@@ -111,11 +119,15 @@ public class ChainReader {
      * @throws IllegalStateException 链上调用失败时抛出
      */
     private Object callValue(String method, List<Object> args) {
+        Timer timer = meterRegistry.timer("chain.rpc", "method", method);
+        long start = System.nanoTime();
         try {
             CallResponse resp = assembler.sendCall(fromAddress, contractAddress, abi, method, args);
             return resp.getReturnObject().get(0);
         } catch (TransactionBaseException | ContractCodecException e) {
             throw new IllegalStateException("链上查询 " + method + " 失败：" + e.getMessage(), e);
+        } finally {
+            timer.record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
         }
     }
 

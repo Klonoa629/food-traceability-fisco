@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.foodtrace.chain.ChainReader;
 import com.foodtrace.entity.SysUser;
 import com.foodtrace.mapper.SysUserMapper;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -31,6 +32,8 @@ public class RoleReconcileTask {
     private final OperateLogService operateLogService;
     /** 链上只读查询 */
     private final ChainReader chainReader;
+    /** 指标注册表 */
+    private final MeterRegistry meterRegistry;
 
     /**
      * 对账入口，周期由 foodtrace.reconcile-interval-ms 配置（默认 10 分钟）
@@ -75,6 +78,7 @@ public class RoleReconcileTask {
         String detail = String.format("角色不一致：%s(id=%d) 库内角色 %d，链上角色 %d，状态 %d",
                 user.getUsername(), user.getId(), expected, chainRole, user.getStatus());
         log.warn(detail);
+        meterRegistry.counter("reconcile.mismatch").increment();
         operateLogService.record(0L, "system", "ROLE_MISMATCH", user.getId(), null, detail);
         return true;
     }

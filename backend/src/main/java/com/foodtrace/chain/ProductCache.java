@@ -1,6 +1,7 @@
 package com.foodtrace.chain;
 
 import com.foodtrace.dto.ProductVO;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -30,6 +31,8 @@ public class ProductCache {
     private final Map<Long, Entry> byId = new ConcurrentHashMap<>();
     /** 批次号 -> 产品 id */
     private final Map<String, Long> batchToId = new ConcurrentHashMap<>();
+    /** 指标注册表 */
+    private final MeterRegistry meterRegistry;
 
     /**
      * 以配置的存活时间构造
@@ -39,8 +42,9 @@ public class ProductCache {
      */
     @Autowired
     public ProductCache(ChainReader chainReader,
-                        @Value("${foodtrace.product-cache-ttl-ms:60000}") long ttlMs) {
-        this(chainReader, ttlMs, System::currentTimeMillis);
+                        @Value("${foodtrace.product-cache-ttl-ms:60000}") long ttlMs,
+                        MeterRegistry meterRegistry) {
+        this(chainReader, ttlMs, System::currentTimeMillis, meterRegistry);
     }
 
     /**
@@ -48,12 +52,15 @@ public class ProductCache {
      *
      * @param chainReader 链上只读查询
      * @param ttlMs       缓存存活时间（毫秒）
-     * @param clock       时间毫秒源
+     * @param clock         时间毫秒源
+     * @param meterRegistry 指标注册表
      */
-    ProductCache(ChainReader chainReader, long ttlMs, LongSupplier clock) {
+    ProductCache(ChainReader chainReader, long ttlMs, LongSupplier clock,
+                 MeterRegistry meterRegistry) {
         this.chainReader = chainReader;
         this.ttlMs = ttlMs;
         this.clock = clock;
+        this.meterRegistry = meterRegistry;
     }
 
     /**
@@ -66,8 +73,10 @@ public class ProductCache {
     public ProductVO get(long productId) {
         Entry entry = byId.get(productId);
         if (entry != null && clock.getAsLong() - entry.loadedAt() < ttlMs) {
+            count("hit");
             return entry.product();
         }
+        count("miss");
         ProductVO fresh = chainReader.product(productId);
         byId.put(productId, new Entry(fresh, clock.getAsLong()));
         return fresh;
@@ -108,6 +117,15 @@ public class ProductCache {
      */
     public void evict(long productId) {
         byId.remove(productId);
+    }
+
+    /**
+     * 计一次缓存命中指标
+     *
+     * @param result hit 或 miss
+     */
+    private void count(String result) {
+        meterRegistry.counter("chain.cache", "result", result).increment();
     }
 
     /**

@@ -11,7 +11,6 @@ import com.foodtrace.security.JwtAuthenticationFilter;
 import com.foodtrace.security.JwtUtil;
 import com.foodtrace.security.LoginUser;
 import com.foodtrace.security.RateLimitService;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.foodtrace.service.OperateLogService;
 import com.foodtrace.service.ProductService;
 import com.foodtrace.service.UserService;
@@ -45,7 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest
 @Import({SecurityConfig.class, JwtAuthenticationFilter.class, JwtUtil.class,
-        ContractProperties.class, RateLimitService.class, SimpleMeterRegistry.class})
+        ContractProperties.class, RateLimitService.class})
 @TestPropertySource(properties = {
         "foodtrace.jwt.secret=test-secret-0123456789abcdef0123456789abcdef",
         "foodtrace.jwt.ttl-minutes=120"})

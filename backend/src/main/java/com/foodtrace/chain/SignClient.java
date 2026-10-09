@@ -3,7 +3,9 @@ package com.foodtrace.chain;
 import com.foodtrace.config.WebaseProperties;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 import java.util.*;
 
@@ -95,7 +97,28 @@ public class SignClient {
                 .uri(properties.getSignUrl() + "/user/{id}/userInfo", signUserId)
                 .retrieve()
                 .body(Map.class);
-        return parseUser(resp, "Webase-Sign 查询托管用户失败");
+        return parseUser(resp, "WeBASE-Sign 查询托管用户失败");
+    }
+
+    /**
+     * 探测签名服务连通性
+     *
+     * <p>收到任何 HTTP 响应（含 4xx/5xx）即视为进程存活，
+     * 仅连接失败判定为不可达。
+     *
+     * @return 可达返回 true
+     */
+    public boolean ping() {
+        try {
+            rest.get().uri(properties.getSignUrl() + "/user/ping/userInfo")
+                    .retrieve().toBodilessEntity();
+            return true;
+        } catch (HttpStatusCodeException responded) {
+            // 服务有响应即存活
+            return true;
+        } catch (RestClientException e) {
+            return false;
+        }
     }
 
     /**

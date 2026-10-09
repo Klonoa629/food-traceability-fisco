@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "mimosa-hook-status/v1",
+  "recordedAt": "2026-10-09T14:57:34.107Z",
+  "sessionId": "sess_f65d5a53-2aa1-477e-8a19-b8c6b65b4af6",
+  "event": "PostToolUse",
+  "toolName": "Edit",
+  "file": "src/test/java/com/foodtrace/controller/SecurityIntegrationTest.java",
+  "outcome": "clear",
+  "coverage": "complete",
+  "findingCount": 0,
+  "durationMs": 13,
+  "hostState": "hook_complete",
+  "reportHint": ".mimosa/reports/"
+}
