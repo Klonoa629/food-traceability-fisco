@@ -39,6 +39,8 @@ class OperateLogServiceTest {
     @Mock
     private SysUserMapper userMapper;
     @Mock
+    private AuditChainService auditChainService;
+    @Mock
     private Client client;
 
     private ContractProperties contractProperties;
@@ -52,7 +54,8 @@ class OperateLogServiceTest {
     void setUp() {
         contractProperties = new ContractProperties();
         contractProperties.setContractAddress(CONTRACT);
-        service = new OperateLogService(operateLogMapper, userMapper, client, contractProperties);
+        service = new OperateLogService(operateLogMapper, auditChainService,
+                userMapper, client, contractProperties);
     }
 
     /**

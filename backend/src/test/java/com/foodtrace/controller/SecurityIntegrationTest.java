@@ -12,6 +12,7 @@ import com.foodtrace.security.JwtUtil;
 import com.foodtrace.security.LoginUser;
 import com.foodtrace.security.RateLimitService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import com.foodtrace.service.AuditChainService;
 import com.foodtrace.service.OperateLogService;
 import com.foodtrace.service.ProductService;
 import com.foodtrace.service.UserService;
@@ -63,6 +64,8 @@ class SecurityIntegrationTest {
     private ProductService productService;
     @MockitoBean
     private OperateLogService operateLogService;
+    @MockitoBean
+    private AuditChainService auditChainService;
     @MockitoBean
     private Client client;
     @MockitoBean

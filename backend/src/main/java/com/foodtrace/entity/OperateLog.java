@@ -31,6 +31,10 @@ public class OperateLog {
     private String chainTxHash;
     /** 补充说明 */
     private String detail;
+    /** 前一行哈希（防删改链） */
+    private String prevHash;
+    /** 本行内容哈希（防篡改） */
+    private String rowHash;
     /** 创建时间 */
     private LocalDateTime createdAt;
 }

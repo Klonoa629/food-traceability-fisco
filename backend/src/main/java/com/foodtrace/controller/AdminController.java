@@ -2,12 +2,14 @@ package com.foodtrace.controller;
 
 import com.foodtrace.common.Result;
 import com.foodtrace.dto.ApproveRequest;
+import com.foodtrace.dto.AuditChainVO;
 import com.foodtrace.dto.PageVO;
 import com.foodtrace.dto.ProductVO;
 import com.foodtrace.dto.RecallRequest;
 import com.foodtrace.dto.UserInfo;
 import com.foodtrace.entity.OperateLog;
 import com.foodtrace.security.LoginUser;
+import com.foodtrace.service.AuditChainService;
 import com.foodtrace.service.OperateLogService;
 import com.foodtrace.service.ProductService;
 import com.foodtrace.service.UserService;
@@ -32,6 +34,8 @@ public class AdminController {
     private final UserService userService;
     /** 审计服务 */
     private final OperateLogService operateLogService;
+    /** 审计哈希链服务 */
+    private final AuditChainService auditChainService;
     /** 产品服务 */
     private final ProductService productService;
 
@@ -114,5 +118,15 @@ public class AdminController {
     @GetMapping("/logs/verify")
     public Result<Map<Long, Boolean>> verifyLogs() {
         return Result.ok(operateLogService.verifyOnChain());
+    }
+
+    /**
+     * 校验审计哈希链完整性，检出删行与篡改
+     *
+     * @return 链校验结果
+     */
+    @GetMapping("/logs/verify-chain")
+    public Result<AuditChainVO> verifyAuditChain() {
+        return Result.ok(auditChainService.verify());
     }
 }

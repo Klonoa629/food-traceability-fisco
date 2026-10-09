@@ -18,6 +18,8 @@ import org.fisco.bcos.sdk.v3.utils.Hex;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 /**
@@ -44,6 +46,8 @@ public class OperateLogService {
 
     /** 审计 Mapper */
     private final OperateLogMapper operateLogMapper;
+    /** 审计哈希链服务 */
+    private final AuditChainService auditChainService;
     /** 账户 Mapper */
     private final SysUserMapper userMapper;
     /** 链客户端 */
@@ -54,7 +58,9 @@ public class OperateLogService {
     private final CryptoSuite cryptoSuite = new CryptoSuite(CryptoType.ECDSA_TYPE);
 
     /**
-     * 记录一条操作审计
+     * 记录一条操作审计并接入哈希链
+     *
+     * <p>单实例内串行接链，保证前向哈希唯一；写入失败只记日志，不阻断业务流程。
      *
      * @param userId      操作账户 id
      * @param username    操作账户名
@@ -63,8 +69,8 @@ public class OperateLogService {
      * @param chainTxHash 链上交易哈希（可空）
      * @param detail      补充说明（可空）
      */
-    public void record(Long userId, String username, String action,
-                       Long targetId, String chainTxHash, String detail) {
+    public synchronized void record(Long userId, String username, String action,
+                                    Long targetId, String chainTxHash, String detail) {
         try {
             OperateLog logEntry = new OperateLog();
             logEntry.setUserId(userId);
@@ -73,7 +79,18 @@ public class OperateLogService {
             logEntry.setTargetId(targetId);
             logEntry.setChainTxHash(chainTxHash);
             logEntry.setDetail(detail);
+            // 显式秒级时间戳：与 DATETIME 精度一致，保证哈希落库往返可复现
+            logEntry.setCreatedAt(LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS));
+            // 链头为已接链的最大 id 行
+            OperateLog head = operateLogMapper.selectOne(new LambdaQueryWrapper<OperateLog>()
+                    .isNotNull(OperateLog::getRowHash)
+                    .orderByDesc(OperateLog::getId)
+                    .last("LIMIT 1"));
+            String prev = head == null ? AuditChainService.GENESIS : head.getRowHash();
+            logEntry.setPrevHash(prev);
             operateLogMapper.insert(logEntry);
+            logEntry.setRowHash(auditChainService.hash(prev, logEntry));
+            operateLogMapper.updateById(logEntry);
         } catch (Exception e) {
             log.error("审计写入失败 action={} userId={}", action, userId, e);
         }

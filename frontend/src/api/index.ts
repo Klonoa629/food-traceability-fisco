@@ -1,6 +1,6 @@
 // 后端接口:认证、业务、监管三组
 import http, { unwrap } from './http'
-import type { LoginResponse, OperateLog, PageVO, ProductVO, Result, UserInfo } from '../types'
+import type { AuditChainVO, LoginResponse, OperateLog, PageVO, ProductVO, Result, UserInfo } from '../types'
 
 // 认证
 export const login = (username: string, password: string) =>
@@ -58,3 +58,7 @@ export const adminRecall = (id: number, reason: string) =>
 // 审计记录链上校验:记录 id -> 是否与链上一致
 export const adminVerifyLogs = () =>
   unwrap<Record<string, boolean>>(http.get<Result<Record<string, boolean>>>('/admin/logs/verify'))
+
+// 审计哈希链完整性校验:检出删行与篡改
+export const adminVerifyChain = () =>
+  unwrap<AuditChainVO>(http.get<Result<AuditChainVO>>('/admin/logs/verify-chain'))

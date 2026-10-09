@@ -24,6 +24,8 @@ CREATE TABLE operate_log (
     target_id     BIGINT       NULL COMMENT '被操作对象 id',
     chain_tx_hash VARCHAR(70)  NULL COMMENT '链上交易哈希',
     detail        VARCHAR(512) NULL COMMENT '补充说明',
+    prev_hash     CHAR(64)     NULL COMMENT '前一行哈希（防删改链）',
+    row_hash      CHAR(64)     NULL COMMENT '本行内容哈希（防篡改）',
     created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     KEY idx_user (user_id),
     KEY idx_action (action)

@@ -3,7 +3,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  adminApprove, adminListUsers, adminLogs, adminRecall, adminRevoke, adminVerifyLogs,
+  adminApprove, adminListUsers, adminLogs, adminRecall, adminRevoke, adminVerifyChain, adminVerifyLogs,
   listProducts, listOrgs
 } from '../../api'
 import { ACTION_NAMES, ROLE_NAMES, STATUS_NAMES, STAGE_COLORS, STAGE_NAMES, formatDateTime, shortAddr, shortHash } from '../../constants/maps'
@@ -126,6 +126,15 @@ async function verifyLogs() {
     verifyMap.value = {}
   } finally {
     verifyLoading.value = false
+  }
+}
+
+async function verifyChain() {
+  const result = await adminVerifyChain()
+  if (result.intact) {
+    ElMessage.success(`审计链完整，共 ${result.total} 条`)
+  } else {
+    ElMessage.error(`审计链不完整：${result.reason}`)
   }
 }
 
@@ -306,6 +315,7 @@ async function logout() {
             <button class="ad-btn-ghost" :disabled="verifyLoading" @click="verifyLogs">
               {{ verifyLoading ? '校验中…' : '链上校验' }}
             </button>
+            <button class="ad-btn-ghost" @click="verifyChain">完整性校验</button>
           </div>
         </div>
 

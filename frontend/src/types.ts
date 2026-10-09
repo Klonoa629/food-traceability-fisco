@@ -57,6 +57,14 @@ export interface PageVO<T> {
   size: number
 }
 
+// 审计哈希链校验结果
+export interface AuditChainVO {
+  intact: boolean
+  total: number
+  firstBrokenId: number | null
+  reason: string | null
+}
+
 export interface LoginResponse {
   token: string
   user: UserInfo
