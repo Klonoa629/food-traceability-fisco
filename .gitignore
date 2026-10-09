@@ -26,3 +26,5 @@ frontend/*.local
 # 部署密钥与证书
 deploy/.env
 deploy/certs/
+# 安全扫描插件本地状态
+.mimosa/
