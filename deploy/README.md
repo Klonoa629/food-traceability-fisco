@@ -88,6 +88,27 @@ MinIO 随 compose 一并启动（仅容器网络内可达，管理台 9001 未�
 默认凭据 minioadmin/minioadmin，环境变量 FOODTRACE_STORAGE_* 覆盖
 地址与凭据。
 
+## 单实例约束
+
+当前设计假定后端以单实例运行，以下组件依赖此前提：
+
+- **审计哈希链接链**（`OperateLogService.record`）：`synchronized`
+  仅在单 JVM 内有效，多实例并发写审计会打断链条
+- **限流**（`RateLimitService`）：计数器存于内存，多实例各算各的
+- **产品缓存**（`ProductCache`）：各实例独立，事件订阅的失效
+  消息每个实例都会收到，缓存一致性可接受
+- **事件订阅**（`ChainEventSubscriber`）：多实例各自订阅，去重
+  靠审计表按交易哈希判断，天然幂等
+
+多实例部署需改造：审计接链改用数据库行锁取链头，限流迁至
+Redis，缓存换分布式缓存或消息广播失效。
+
+## 优雅停机
+
+后端已启用 Spring 优雅停机（`server.shutdown=graceful`，
+超时 30 秒），Docker 的 `stop_grace_period` 设为 35 秒——
+正在上链的交易（1-3 秒）在容器停止前可正常完成，不会腰斩。
+
 ## 加密范围
 
 只加密对外的入口段，节点通信的加密由 FISCO 自带：

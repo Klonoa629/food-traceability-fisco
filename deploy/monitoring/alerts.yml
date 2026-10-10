@@ -10,12 +10,20 @@ groups:
           description: "过去 5 分钟内发现 {{ $value }} 笔外部交易，请核实操作来源。"
 
       - alert: AuditChainBroken
-        expr: increase(audit_chain_broken_total[5m]) > 0
+        expr: increase(audit_chain_broken_total[5m]) > 0 or increase(audit_verify_broken_total[5m]) > 0
         labels:
           severity: critical
         annotations:
           summary: "审计哈希链校验不通过"
           description: "审计记录可能被删除或篡改，立即核查 operate_log 表。"
+
+      - alert: AuditAnchorMismatch
+        expr: increase(audit_verify_anchor_mismatch_total[10m]) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: "审计链头与链上锚定不一致"
+          description: "审计表可能在锚定后被整库重写，立即与链上锚定比对。"
 
       - alert: RoleMismatch
         expr: increase(reconcile_mismatch_total[10m]) > 0

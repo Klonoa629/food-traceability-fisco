@@ -1,6 +1,7 @@
 server:
   port: 8081
   address: 0.0.0.0
+  shutdown: graceful
 
 fisco:
   cert-path: conf
@@ -29,6 +30,8 @@ foodtrace:
   anchor-address: "${FOODTRACE_ANCHOR_ADDRESS:}"
   # 审计锚定周期（毫秒），默认 10 分钟
   anchor-interval-ms: 600000
+  # 审计完整性定时校验周期（毫秒），默认 10 分钟
+  verify-interval-ms: 600000
   jwt:
     secret: "${FOODTRACE_JWT_SECRET}"
     ttl-minutes: 120
@@ -36,6 +39,8 @@ foodtrace:
 spring:
   application:
     name: foodtrace-backend
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   servlet:
     multipart:
       max-file-size: 20MB

@@ -25,6 +25,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 60s
+    stop_grace_period: 35s
     depends_on:
       minio:
         condition: service_started
