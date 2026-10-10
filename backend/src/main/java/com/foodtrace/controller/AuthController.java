@@ -46,11 +46,14 @@ public class AuthController {
     /**
      * 账户登录，签发 JWT
      *
-     * @param request 登录请求
+     * @param request     登录请求
+     * @param httpRequest 当前请求（用于 IP 限流）
      * @return 令牌与账户信息
      */
     @PostMapping("/login")
-    public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+    public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request,
+                                       HttpServletRequest httpRequest) {
+        rateLimitService.checkIpLimit(httpRequest, "auth");
         return Result.ok(userService.login(request));
     }
 
