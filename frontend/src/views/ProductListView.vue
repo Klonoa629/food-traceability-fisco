@@ -7,7 +7,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import AppShell from '../components/AppShell.vue'
 import { chainPing, createProduct, listOrgs, listProducts } from '../api'
 import { useAuthStore } from '../stores/auth'
-import { ROLE_NAMES, STAGE_COLORS, STAGE_NAMES, shortAddr } from '../constants/maps'
+import { STAGE_COLORS, STAGE_NAMES, shortAddr } from '../constants/maps'
 import type { ProductVO, UserInfo } from '../types'
 
 const auth = useAuthStore()
