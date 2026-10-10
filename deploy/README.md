@@ -24,6 +24,29 @@
 `443:443`（可同时保留 80），`docker compose up -d` 重建生效。
 自签证书仅供演示，正式环境换机构签发证书。
 
+## 数据库备份与恢复
+
+备份由 WSL 内的 systemd timer 每日 03:30 触发（错过自动补跑），
+热备不锁表，备份带 SHA-256 校验文件，保留 14 天。安装：
+
+    mkdir -p ~/opt/bin
+    cp deploy/backup/backup-foodtrace.sh ~/opt/bin/ && chmod +x ~/opt/bin/backup-foodtrace.sh
+    printf '[client]\nhost=127.0.0.1\nuser=root\npassword=***\n' > ~/opt/mysql-backup.cnf
+    chmod 600 ~/opt/mysql-backup.cnf
+    sudo cp deploy/backup/foodtrace-backup.{service,timer} /etc/systemd/system/
+    sudo systemctl daemon-reload && sudo systemctl enable --now foodtrace-backup.timer
+
+手动备份与恢复（先核对校验和）：
+
+    ~/opt/bin/backup-foodtrace.sh
+    cd ~/backups/foodtrace && sha256sum -c <备份文件>.sha256
+    mysql -uroot -p -e "CREATE DATABASE foodtrace DEFAULT CHARSET utf8mb4"
+    zcat <备份文件>.sql.gz | mysql -uroot -p foodtrace
+
+恢复后启动后端，调用 GET /api/admin/logs/verify-chain 确认审计哈希链完整。
+2026-10-10 已做过一次完整演练：删库恢复后行数一致、审计链完整续接、
+链上交易校验 36/36 通过。
+
 ## 加密范围
 
 只加密对外的入口段，节点通信的加密由 FISCO 自带：

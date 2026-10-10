@@ -1,0 +1,7 @@
+[Unit]
+Description=foodtrace database backup
+
+[Service]
+Type=oneshot
+User=microft
+ExecStart=/home/microft/opt/bin/backup-foodtrace.sh
