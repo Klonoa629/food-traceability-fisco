@@ -25,6 +25,10 @@ foodtrace:
     access-key: ${FOODTRACE_STORAGE_ACCESS_KEY:minioadmin}
     secret-key: ${FOODTRACE_STORAGE_SECRET_KEY:minioadmin}
     bucket: foodtrace-evidence
+  # 审计锚定合约地址（空则不锚定）
+  anchor-address: "${FOODTRACE_ANCHOR_ADDRESS:}"
+  # 审计锚定周期（毫秒），默认 10 分钟
+  anchor-interval-ms: 600000
   jwt:
     secret: "${FOODTRACE_JWT_SECRET}"
     ttl-minutes: 120

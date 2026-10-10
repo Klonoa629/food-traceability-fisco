@@ -9,6 +9,7 @@ import com.foodtrace.dto.RecallRequest;
 import com.foodtrace.dto.UserInfo;
 import com.foodtrace.entity.OperateLog;
 import com.foodtrace.security.LoginUser;
+import com.foodtrace.service.AuditAnchorTask;
 import com.foodtrace.service.AuditChainService;
 import com.foodtrace.service.OperateLogService;
 import com.foodtrace.service.ProductService;
@@ -36,6 +37,8 @@ public class AdminController {
     private final OperateLogService operateLogService;
     /** 审计哈希链服务 */
     private final AuditChainService auditChainService;
+    /** 审计锚定任务 */
+    private final AuditAnchorTask auditAnchorTask;
     /** 产品服务 */
     private final ProductService productService;
 
@@ -128,5 +131,15 @@ public class AdminController {
     @GetMapping("/logs/verify-chain")
     public Result<AuditChainVO> verifyAuditChain() {
         return Result.ok(auditChainService.verify());
+    }
+
+    /**
+     * 校验审计链头与链上锚定是否一致
+     *
+     * @return null 表示一致，非 null 为差异描述
+     */
+    @GetMapping("/logs/verify-anchor")
+    public Result<String> verifyAnchor() {
+        return Result.ok(auditAnchorTask.verifyAnchor());
     }
 }
