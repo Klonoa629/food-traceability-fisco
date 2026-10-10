@@ -58,6 +58,17 @@ public class OperateLogService {
     private final CryptoSuite cryptoSuite = new CryptoSuite(CryptoType.ECDSA_TYPE);
 
     /**
+     * 判断交易哈希是否已有审计记录（供事件订阅识别历史交易）
+     *
+     * @param chainTxHash 链上交易哈希
+     * @return 已存在返回 true
+     */
+    public boolean existsByTxHash(String chainTxHash) {
+        return operateLogMapper.selectCount(new LambdaQueryWrapper<OperateLog>()
+                .eq(OperateLog::getChainTxHash, chainTxHash)) > 0;
+    }
+
+    /**
      * 记录一条操作审计并接入哈希链
      *
      * <p>单实例内串行接链，保证前向哈希唯一；写入失败只记日志，不阻断业务流程。

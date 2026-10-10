@@ -19,6 +19,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
  * 上链写入统一入口
@@ -58,6 +60,12 @@ public class ChainWriter {
         this.meterRegistry = meterRegistry;
     }
 
+    /** 近期自有交易哈希（供事件订阅区分内外部交易），有界防止增长 */
+    private final Deque<String> ownTxOrder = new ConcurrentLinkedDeque<>();
+    private final Set<String> ownTxSet = ConcurrentHashMap.newKeySet();
+    /** 自有交易登记上限 */
+    private static final int OWN_TX_CAPACITY = 1024;
+
     /**
      * 以 Sign 托管身份发送一笔合约写交易
      *
@@ -79,7 +87,10 @@ public class ChainWriter {
             long handle = assembler.getRawTransaction(contractAddress, abi, method, args);
             // 取未签名交易的交易哈希，交由 Sign 托管身份签名
             byte[] hash = encoder.encodeAndHashBytes(handle);
-            String sigHex = signClient.signMessageHash(signUserId, Hex.toHexStringWithPrefix(hash));
+            String txHash = Hex.toHexStringWithPrefix(hash);
+            // 广播前登记为自有交易：事件订阅据此跳过本方交易的重复审计
+            markOwn(txHash);
+            String sigHex = signClient.signMessageHash(signUserId, txHash);
             // 解析签名
             byte[] sig = Numeric.hexStringToByteArray(sigHex);
             ECDSASignatureResult signature = new ECDSASignatureResult(sig[0],
@@ -105,5 +116,31 @@ public class ChainWriter {
                     .register(meterRegistry));
             signProvider.clearCurrentUser();
         }
+    }
+
+    /**
+     * 登记一笔自有交易哈希（有界，超出容量淘汰最旧）
+     *
+     * @param txHash 交易哈希
+     */
+    void markOwn(String txHash) {
+        if (ownTxOrder.size() >= OWN_TX_CAPACITY) {
+            String oldest = ownTxOrder.poll();
+            if (oldest != null) {
+                ownTxSet.remove(oldest);
+            }
+        }
+        ownTxOrder.add(txHash);
+        ownTxSet.add(txHash);
+    }
+
+    /**
+     * 判断交易是否为本服务发出
+     *
+     * @param txHash 交易哈希
+     * @return 自有返回 true
+     */
+    public boolean isOwn(String txHash) {
+        return txHash != null && ownTxSet.contains(txHash);
     }
 }
