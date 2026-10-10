@@ -5,7 +5,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import AppShell from '../components/AppShell.vue'
-import { addRecord, getProduct, handover, inspect, listOrgs } from '../api'
+import { addRecord, getProduct, handover, inspect, listOrgs, uploadEvidence } from '../api'
 import { useAuthStore } from '../stores/auth'
 import {
   ROLE_NAMES, ROLE_STAGE, STAGE_COLORS, STAGE_NAMES,
@@ -55,12 +55,29 @@ onMounted(load)
 // 环节记录
 const recordDialog = ref(false)
 const recordFormRef = ref<FormInstance>()
-const recordForm = reactive({ description: '', location: '', dataHash: '' })
+const recordForm = reactive({ description: '', location: '', dataHash: '', evidenceFile: '' })
 const recordRules: FormRules = {
   description: [{ required: true, message: '请输入记录内容', trigger: 'blur' }],
   location: [{ required: true, message: '请输入地点', trigger: 'blur' }]
 }
 const recordSubmitting = ref(false)
+const evidenceUploading = ref(false)
+
+// 上传存证文件，成功后以内容哈希作为 dataHash
+async function onEvidenceChange(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  evidenceUploading.value = true
+  try {
+    const info = await uploadEvidence(file)
+    recordForm.dataHash = info.sha256
+    recordForm.evidenceFile = info.filename
+    ElMessage.success(`存证已上传：${info.filename}`)
+  } finally {
+    evidenceUploading.value = false
+    ;(event.target as HTMLInputElement).value = ''
+  }
+}
 
 async function submitRecord() {
   await recordFormRef.value?.validate()
@@ -74,7 +91,7 @@ async function submitRecord() {
     })
     ElMessage.success('记录已上链')
     recordDialog.value = false
-    Object.assign(recordForm, { description: '', location: '', dataHash: '' })
+    Object.assign(recordForm, { description: '', location: '', dataHash: '', evidenceFile: '' })
   } finally {
     recordSubmitting.value = false
   }
@@ -182,7 +199,9 @@ async function submitInspect() {
                 <div class="tl-meta">
                   <span>操作方 <b>{{ orgNameOf(r.operator) }}</b></span>
                   <span>地点 <b>{{ r.location || '-' }}</b></span>
-                  <span v-if="r.dataHash" class="mono muted" :title="r.dataHash">存证 {{ shortHash(r.dataHash) }}</span>
+                  <span v-if="r.dataHash">
+                    <a class="mono evidence-link" :href="`/api/storage/${r.dataHash}`" target="_blank" :title="r.dataHash">存证 {{ shortHash(r.dataHash) }}</a>
+                  </span>
                 </div>
               </div>
             </div>
@@ -219,7 +238,13 @@ async function submitInspect() {
             <el-input v-model="recordForm.location" placeholder="如:云南昆明" />
           </el-form-item>
           <el-form-item label="数据哈希(选填)">
-            <el-input v-model="recordForm.dataHash" placeholder="留空则由后端自动计算 SHA-256 存证" />
+            <div class="evidence-row">
+              <el-input v-model="recordForm.dataHash" placeholder="留空则由后端自动计算 SHA-256 存证" />
+              <label class="evidence-upload" :class="{ uploading: evidenceUploading }">
+                {{ evidenceUploading ? '上传中…' : (recordForm.evidenceFile || '上传附件') }}
+                <input type="file" hidden @change="onEvidenceChange" :disabled="evidenceUploading" />
+              </label>
+            </div>
           </el-form-item>
         </el-form>
         <template #footer>
@@ -333,6 +358,15 @@ async function submitInspect() {
 .tl-desc { margin: 8px 0 10px; font-size: 15px; }
 .tl-meta { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--ft-text-secondary); }
 .tl-meta b { color: var(--ft-text); font-weight: 600; }
+.evidence-link { color: var(--el-color-primary); text-decoration: none; font-size: 13px; }
+.evidence-link:hover { text-decoration: underline; }
+.evidence-row { display: flex; gap: 10px; width: 100%; }
+.evidence-upload {
+  flex-shrink: 0; display: inline-flex; align-items: center; padding: 0 12px;
+  border: 1px dashed var(--el-border-color); border-radius: 4px;
+  font-size: 13px; cursor: pointer; white-space: nowrap; color: var(--ft-text-secondary);
+}
+.evidence-upload:hover, .evidence-upload.uploading { border-color: var(--el-color-primary); color: var(--el-color-primary); }
 
 .action-panel { padding: 20px 22px; position: sticky; top: 80px; }
 .action-hint { font-size: 14px; margin: 0 0 14px; }

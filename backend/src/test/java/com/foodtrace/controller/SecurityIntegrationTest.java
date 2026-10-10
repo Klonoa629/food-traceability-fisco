@@ -11,6 +11,7 @@ import com.foodtrace.security.JwtAuthenticationFilter;
 import com.foodtrace.security.JwtUtil;
 import com.foodtrace.security.LoginUser;
 import com.foodtrace.security.RateLimitService;
+import com.foodtrace.storage.StorageService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.foodtrace.service.AuditChainService;
 import com.foodtrace.service.OperateLogService;
@@ -70,6 +71,8 @@ class SecurityIntegrationTest {
     private Client client;
     @MockitoBean
     private ProductCache productCache;
+    @MockitoBean
+    private StorageService storageService;
 
     /**
      * 构造指定身份与状态的账户实体
@@ -209,5 +212,19 @@ class SecurityIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(429))
                 .andExpect(jsonPath("$.message").value("请求过于频繁，请稍后再试"));
+    }
+
+    @Test
+    void evidenceDownloadShouldBeAnonymousButUploadRequiresAuth() throws Exception {
+        when(storageService.get(org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(new StorageService.EvidenceFile("质检报告.pdf", new byte[]{1, 2}));
+        // 下载匿名可达
+        mockMvc.perform(get("/api/storage/" + "a".repeat(64)))
+                .andExpect(status().isOk());
+        // 上传未登录拒绝
+        mockMvc.perform(multipart("/api/storage/upload").file(
+                        new org.springframework.mock.web.MockMultipartFile(
+                                "file", "a.pdf", "application/pdf", new byte[]{1})))
+                .andExpect(status().isUnauthorized());
     }
 }

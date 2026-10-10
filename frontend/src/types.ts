@@ -65,6 +65,13 @@ export interface AuditChainVO {
   reason: string | null
 }
 
+// 存证上传结果
+export interface EvidenceInfo {
+  sha256: string
+  filename: string
+  size: number
+}
+
 export interface LoginResponse {
   token: string
   user: UserInfo

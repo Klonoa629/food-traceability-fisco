@@ -19,6 +19,12 @@ foodtrace:
   reconcile-interval-ms: 600000
   # 产品读缓存存活时间（毫秒），默认 1 分钟
   product-cache-ttl-ms: 60000
+  # 存证对象存储（MinIO）
+  storage:
+    endpoint: ${FOODTRACE_STORAGE_ENDPOINT:http://127.0.0.1:9000}
+    access-key: ${FOODTRACE_STORAGE_ACCESS_KEY:minioadmin}
+    secret-key: ${FOODTRACE_STORAGE_SECRET_KEY:minioadmin}
+    bucket: foodtrace-evidence
   jwt:
     secret: "${FOODTRACE_JWT_SECRET}"
     ttl-minutes: 120
@@ -26,6 +32,10 @@ foodtrace:
 spring:
   application:
     name: foodtrace-backend
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 25MB
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/foodtrace?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true

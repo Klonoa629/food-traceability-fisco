@@ -1,6 +1,6 @@
 // 后端接口:认证、业务、监管三组
 import http, { unwrap } from './http'
-import type { AuditChainVO, LoginResponse, OperateLog, PageVO, ProductVO, Result, UserInfo } from '../types'
+import type { AuditChainVO, EvidenceInfo, LoginResponse, OperateLog, PageVO, ProductVO, Result, UserInfo } from '../types'
 
 // 认证
 export const login = (username: string, password: string) =>
@@ -62,3 +62,10 @@ export const adminVerifyLogs = () =>
 // 审计哈希链完整性校验:检出删行与篡改
 export const adminVerifyChain = () =>
   unwrap<AuditChainVO>(http.get<Result<AuditChainVO>>('/admin/logs/verify-chain'))
+
+// 上传存证文件:返回内容哈希,可直接作为业务操作的 dataHash
+export const uploadEvidence = (file: File) => {
+  const form = new FormData()
+  form.append('file', file)
+  return unwrap<EvidenceInfo>(http.post<Result<EvidenceInfo>>('/storage/upload', form))
+}

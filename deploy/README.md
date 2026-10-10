@@ -47,6 +47,19 @@
 2026-10-10 已做过一次完整演练：删库恢复后行数一致、审计链完整续接、
 链上交易校验 36/36 通过。
 
+## 存证对象存储
+
+MinIO 随 compose 一并启动（仅容器网络内可达，管理台 9001 未对外）。
+对象按内容 SHA-256 寻址，链上 data_hash 即下载键：
+`GET /api/storage/{hash}` 匿名可下载（受 IP 限流），上传需登录。
+本地开发单独起一个：
+
+    docker run -d --name foodtrace-minio -p 9000:9000 -p 9001:9001 \
+      minio/minio server /data --console-address :9001
+
+默认凭据 minioadmin/minioadmin，环境变量 FOODTRACE_STORAGE_* 覆盖
+地址与凭据。
+
 ## 加密范围
 
 只加密对外的入口段，节点通信的加密由 FISCO 自带：
