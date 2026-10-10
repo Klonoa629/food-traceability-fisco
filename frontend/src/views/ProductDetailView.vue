@@ -4,6 +4,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
+import QRCode from 'qrcode'
 import AppShell from '../components/AppShell.vue'
 import { addRecord, getProduct, handover, inspect, listOrgs, uploadEvidence } from '../api'
 import { useAuthStore } from '../stores/auth'
@@ -40,12 +41,17 @@ const myStage = computed(() => (auth.user ? ROLE_STAGE[auth.user.role] : undefin
 const canWriteRecord = computed(() => canOperate.value && myStage.value !== undefined)
 const canInspect = computed(() => canOperate.value && auth.user?.role === 3)
 
+// 公开溯源页二维码:消费者扫码按批次号查验
+const qrDataUrl = ref('')
+
 async function load() {
   loading.value = true
   try {
     const [p, os] = await Promise.all([getProduct(id), listOrgs()])
     product.value = p
     orgs.value = os
+    const url = `${location.origin}/trace?batchNo=${encodeURIComponent(p.batchNo)}`
+    qrDataUrl.value = await QRCode.toDataURL(url, { width: 160, margin: 1 })
   } finally {
     loading.value = false
   }
@@ -177,6 +183,10 @@ async function submitInspect() {
           <div class="meta-row"><span class="muted">当前持有</span><b>{{ orgNameOf(product.currentHolder) }}</b></div>
           <div class="meta-row"><span class="muted">持有地址</span><span class="mono">{{ shortAddr(product.currentHolder) }}</span></div>
           <div class="meta-row"><span class="muted">溯源记录</span><b>{{ product.records?.length ?? 0 }} 条</b></div>
+          <div v-if="qrDataUrl" class="qr-row">
+            <img class="qr-img" :src="qrDataUrl" alt="溯源二维码" />
+            <span class="muted qr-tip">消费者扫码<br />查验公开溯源</span>
+          </div>
         </div>
       </div>
 
@@ -312,6 +322,16 @@ async function submitInspect() {
 .desc { margin: 10px 0 0; color: var(--ft-text-secondary); font-size: 15px; }
 .dh-right { min-width: 260px; display: flex; flex-direction: column; gap: 8px; justify-content: center; }
 .meta-row { display: flex; justify-content: space-between; font-size: 14px; gap: 16px; }
+.qr-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--ft-border);
+}
+.qr-img { width: 80px; height: 80px; border-radius: 6px; }
+.qr-tip { font-size: 13px; line-height: 1.6; }
 
 .detail-body {
   display: grid;
