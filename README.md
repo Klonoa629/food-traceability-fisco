@@ -101,5 +101,3 @@ cd blockchain && npm test     # 合约 47 个用例
 cd backend && ./gradlew test  # 后端 19 个用例（-Pintegration 需链环境）
 cd frontend && npm run build  # 类型检查 + 构建
 ```
-
-接口字段与前端对接约定见 [FRONTEND_BRIEF.md](FRONTEND_BRIEF.md)。
