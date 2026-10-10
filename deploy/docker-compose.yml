@@ -7,6 +7,12 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     volumes:
       - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   backend:
     build: ../backend
@@ -28,7 +34,7 @@ services:
     stop_grace_period: 35s
     depends_on:
       minio:
-        condition: service_started
+        condition: service_healthy
 
   web:
     build: ../frontend
