@@ -9,8 +9,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 /**
  * 产品溯源接口（需认证，链上权限由合约裁决）
  *
@@ -38,13 +36,16 @@ public class ProductController {
     }
 
     /**
-     * 查询全部产品，新注册的在前
+     * 分页查询产品，新注册的在前
      *
-     * @return 产品列表
+     * @param page 页码，从 1 起
+     * @param size 每页条数
+     * @return 分页产品列表
      */
     @GetMapping
-    public Result<List<ProductVO>> list() {
-        return Result.ok(productService.list());
+    public Result<PageVO<ProductVO>> list(@RequestParam(defaultValue = "1") int page,
+                                          @RequestParam(defaultValue = "20") int size) {
+        return Result.ok(productService.list(page, size));
     }
 
     /**

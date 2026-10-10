@@ -142,8 +142,26 @@ class ProductServiceTest {
         when(productCache.get(1L)).thenReturn(product(1, 0));
         when(productCache.get(2L)).thenReturn(product(2, 2));
 
-        assertThat(productService.list()).extracting(ProductVO::id)
+        PageVO<ProductVO> result = productService.list(1, 20);
+
+        assertThat(result.records()).extracting(ProductVO::id)
                 .containsExactly(2L, 1L);
+        assertThat(result.total()).isEqualTo(2);
+    }
+
+    @Test
+    void listShouldSliceByPage() {
+        when(chainReader.productCount()).thenReturn(3L);
+        when(productCache.get(1L)).thenReturn(product(1, 0));
+
+        PageVO<ProductVO> result = productService.list(2, 2);
+
+        // 共 3 条每页 2 条：第二页只剩最早的 id=1
+        assertThat(result.records()).extracting(ProductVO::id)
+                .containsExactly(1L);
+        assertThat(result.total()).isEqualTo(3);
+        // 页码超出范围返回空页
+        assertThat(productService.list(9, 2).records()).isEmpty();
     }
 
     @Test

@@ -16,6 +16,10 @@ const router = useRouter()
 const products = ref<ProductVO[]>([])
 const orgs = ref<UserInfo[]>([])
 const loading = ref(false)
+// 分页状态
+const page = ref(1)
+const size = ref(20)
+const total = ref(0)
 
 // 链上地址 -> 机构名
 const orgNameOf = computed(() => {
@@ -40,12 +44,22 @@ async function refreshHeight() {
 async function load() {
   loading.value = true
   try {
-    const [ps, os] = await Promise.all([listProducts(), listOrgs()])
-    products.value = ps
+    const [ps, os] = await Promise.all([
+      listProducts({ page: page.value, size: size.value }),
+      listOrgs()
+    ])
+    products.value = ps.records
+    total.value = ps.total
     orgs.value = os
   } finally {
     loading.value = false
   }
+}
+
+// 每页条数变化时回到第一页
+function resetPage() {
+  page.value = 1
+  load()
 }
 
 onMounted(() => {
@@ -91,6 +105,8 @@ async function submitCreate() {
     ElMessage.success(`产品「${p.name}」已注册上链`)
     dialogVisible.value = false
     Object.assign(form, { name: '', batchNo: '', description: '', location: '', dataHash: '' })
+    // 新产品排在最前，回到第一页可见
+    page.value = 1
     await load()
   } finally {
     submitting.value = false
@@ -118,7 +134,7 @@ function openDetail(p: ProductVO) {
         <el-input
           v-model="keyword"
           class="search-input"
-          placeholder="搜索产品名称 / 批次号"
+          placeholder="筛选当前页:产品名称 / 批次号"
           clearable
           size="large"
         />
@@ -154,6 +170,19 @@ function openDetail(p: ProductVO) {
         </div>
       </div>
     </div>
+
+    <el-pagination
+      v-if="total > 0 && !keyword"
+      class="product-pager"
+      background
+      layout="total, sizes, prev, pager, next"
+      :total="total"
+      :page-sizes="[10, 20, 50, 100]"
+      v-model:current-page="page"
+      v-model:page-size="size"
+      @current-change="load"
+      @size-change="resetPage"
+    />
 
     <el-dialog v-model="dialogVisible" title="注册产品(上链)" width="480px" :close-on-click-modal="false">
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
@@ -212,6 +241,7 @@ function openDetail(p: ProductVO) {
 .page-head p { margin: 0; font-size: 14px; }
 .page-head-right { display: flex; gap: 12px; align-items: center; }
 .search-input { width: 260px; }
+.product-pager { margin-top: 20px; justify-content: flex-end; }
 .product-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));

@@ -162,8 +162,9 @@ const orgNameOf = computed(() => {
 async function loadProducts() {
   productsLoading.value = true
   try {
-    const [ps, os] = await Promise.all([listProducts(), listOrgs()])
-    products.value = ps
+    // 召回对象为在途产品，取第一页大条数即可覆盖演示规模
+    const [ps, os] = await Promise.all([listProducts({ page: 1, size: 100 }), listOrgs()])
+    products.value = ps.records
     orgs.value = os
   } finally {
     productsLoading.value = false

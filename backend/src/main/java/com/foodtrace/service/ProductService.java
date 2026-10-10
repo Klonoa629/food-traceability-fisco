@@ -210,16 +210,26 @@ public class ProductService {
     }
 
     /**
-     * 查询全部产品，新注册的在前
+     * 分页查询产品，新注册的在前
      *
-     * @return 产品视图列表
+     * <p>产品 id 链上自增连续，按 id 倒序截取本页区间逐条走读缓存。
+     *
+     * @param page 页码（从 1 起）
+     * @param size 每页条数（1-100）
+     * @return 分页产品视图
      */
-    public List<ProductVO> list() {
+    public PageVO<ProductVO> list(int page, int size) {
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        long safePage = Math.max(page, 1);
+        long total = chainReader.productCount();
+        // 本页 id 区间 [lo, hi]，倒序输出；超出范围时区间为空
+        long hi = total - (safePage - 1) * safeSize;
+        long lo = Math.max(hi - safeSize + 1, 1);
         List<ProductVO> products = new ArrayList<>();
-        for (long id = chainReader.productCount(); id >= 1; id--) {
+        for (long id = hi; id >= lo; id--) {
             products.add(productCache.get(id));
         }
-        return products;
+        return new PageVO<>(products, total, safePage, safeSize);
     }
 
     /**
