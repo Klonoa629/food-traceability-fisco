@@ -13,7 +13,7 @@ webase:
   app-id: foodtrace
 
 foodtrace:
-  contract-address: "0x2af6160e266f763652f433a80b94fc13f4065303"
+  contract-address: "${FOODTRACE_CONTRACT_ADDRESS:0x2af6160e266f763652f433a80b94fc13f4065303}"
   # 合约事件订阅（外部交易的缓存失效与审计）
   event-subscribe: true
   # 角色对账周期（毫秒），默认 10 分钟
