@@ -1,13 +1,16 @@
 package com.foodtrace.controller;
 
 import com.foodtrace.common.Result;
+import com.foodtrace.dto.ChangePasswordRequest;
 import com.foodtrace.dto.LoginRequest;
 import com.foodtrace.dto.LoginResponse;
 import com.foodtrace.dto.RegisterRequest;
+import com.foodtrace.security.LoginUser;
 import com.foodtrace.security.RateLimitService;
 import com.foodtrace.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -49,5 +52,19 @@ public class AuthController {
     @PostMapping("/login")
     public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         return Result.ok(userService.login(request));
+    }
+
+    /**
+     * 修改密码，改密后当前令牌立即失效（需重新登录）
+     *
+     * @param request 改密请求
+     * @param user    当前登录账户
+     * @return 成功提示
+     */
+    @PostMapping("/change-password")
+    public Result<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request,
+                                       @AuthenticationPrincipal LoginUser user) {
+        userService.changePassword(request, user);
+        return Result.ok(null);
     }
 }

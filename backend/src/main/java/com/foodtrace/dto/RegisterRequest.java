@@ -18,7 +18,8 @@ public record RegisterRequest(
         String username,
 
         @NotBlank(message = "密码不能为空")
-        @Size(min = 6, max = 64, message = "密码长度需在 6-64 位之间")
+        @Size(min = 8, max = 64, message = "密码长度需在 8-64 位之间")
+        @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d).+$", message = "密码须同时包含字母和数字")
         String password,
 
         @NotBlank(message = "机构名称不能为空")

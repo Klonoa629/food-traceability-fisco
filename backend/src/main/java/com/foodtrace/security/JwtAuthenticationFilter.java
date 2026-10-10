@@ -51,6 +51,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 SysUser user = userService.findByUsername(username);
                 // 仅生效账户可认证成功，吊销或待审批账户一律视为未登录
                 if (user != null && Integer.valueOf(1).equals(user.getStatus())) {
+                    // 比对密码版本：改密后旧令牌立即失效
+                    int tokenVer = jwtUtil.passwordVersion(header.substring(7));
+                    int dbVer = user.getPwdVersion() == null ? 0 : user.getPwdVersion();
+                    if (tokenVer != dbVer) {
+                        throw new IllegalStateException("密码已修改");
+                    }
                     List<SimpleGrantedAuthority> authorities = new ArrayList<>(
                             List.of(new SimpleGrantedAuthority("ROLE_USER")));
                     if (Boolean.TRUE.equals(user.getIsRegulator())) {

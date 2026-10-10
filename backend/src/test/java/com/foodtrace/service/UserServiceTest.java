@@ -5,6 +5,7 @@ import com.foodtrace.chain.ChainRoleService;
 import com.foodtrace.chain.SignClient;
 import com.foodtrace.common.BizException;
 import com.foodtrace.common.ErrorCode;
+import com.foodtrace.dto.ChangePasswordRequest;
 import com.foodtrace.dto.LoginRequest;
 import com.foodtrace.dto.ProductVO;
 import com.foodtrace.dto.RegisterRequest;
@@ -200,5 +201,35 @@ class UserServiceTest {
 
         assertThat(result.status()).isEqualTo(2);
         verify(chainRoleService).removeRole("regulator_001", "0xfarm");
+    }
+
+    @Test
+    void changePasswordShouldRejectWrongOldPassword() {
+        SysUser entity = user(1);
+        entity.setPasswordHash(passwordEncoder.encode("correct8a"));
+        when(userMapper.selectById(1L)).thenReturn(entity);
+
+        assertThatThrownBy(() -> userService.changePassword(
+                new ChangePasswordRequest("wrong", "newpass1a"), regulator))
+                .isInstanceOf(BizException.class)
+                .extracting(e -> ((BizException) e).getCode())
+                .isEqualTo(ErrorCode.PARAM_ERROR.getCode());
+    }
+
+    @Test
+    void changePasswordShouldIncrementVersion() {
+        SysUser entity = user(1);
+        entity.setPasswordHash(passwordEncoder.encode("oldpass1"));
+        entity.setPwdVersion(3);
+        when(userMapper.selectById(1L)).thenReturn(entity);
+
+        userService.changePassword(
+                new ChangePasswordRequest("oldpass1", "newpass1a"), regulator);
+
+        verify(userMapper).updateById(argThat((SysUser u) ->
+                u.getPwdVersion() == 4
+                && passwordEncoder.matches("newpass1a", u.getPasswordHash())));
+        verify(operateLogService).record(eq(1L), eq("regulator"),
+                eq("PASSWORD_CHANGED"), eq(1L), isNull(), anyString());
     }
 }

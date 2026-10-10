@@ -23,6 +23,8 @@ public class SysUser {
     private String username;
     /** 密码哈希 */
     private String passwordHash;
+    /** 密码版本（改密递增，使旧令牌失效） */
+    private Integer pwdVersion;
     /** 机构名称 */
     private String orgName;
     /** 合约角色 0-6 */

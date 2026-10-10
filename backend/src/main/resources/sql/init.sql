@@ -4,6 +4,7 @@ CREATE TABLE sys_user (
     id            BIGINT       PRIMARY KEY AUTO_INCREMENT COMMENT '主键',
     username      VARCHAR(64)  NOT NULL COMMENT '登录名',
     password_hash VARCHAR(100) NOT NULL COMMENT '密码哈希',
+    pwd_version   INT          NOT NULL DEFAULT 0 COMMENT '密码版本（改密递增，使旧令牌失效）',
     org_name      VARCHAR(128) NOT NULL COMMENT '机构名称',
     role          TINYINT      NOT NULL DEFAULT 0 COMMENT '合约角色 0-6',
     is_regulator  TINYINT      NOT NULL DEFAULT 0 COMMENT '0 = 非监管账户，1 = 监管账户',

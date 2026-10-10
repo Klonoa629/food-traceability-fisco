@@ -267,6 +267,28 @@ public class UserService {
     }
 
     /**
+     * 修改密码：校验旧密码后更新哈希并递增版本号，旧令牌立即失效
+     *
+     * @param request 改密请求
+     * @param user    当前登录账户
+     * @throws BizException 旧密码错误时抛出
+     */
+    public void changePassword(ChangePasswordRequest request, LoginUser user) {
+        SysUser entity = userMapper.selectById(user.id());
+        if (entity == null) {
+            throw new BizException(ErrorCode.NOT_FOUND, "账户不存在");
+        }
+        if (!passwordEncoder.matches(request.oldPassword(), entity.getPasswordHash())) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "当前密码不正确");
+        }
+        entity.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        entity.setPwdVersion((entity.getPwdVersion() == null ? 0 : entity.getPwdVersion()) + 1);
+        userMapper.updateById(entity);
+        operateLogService.record(user.id(), user.username(),
+                "PASSWORD_CHANGED", user.id(), null, "密码已修改，旧令牌全部失效");
+    }
+
+    /**
      * 加载账户，不存在即抛 404
      *
      * @param id 账户 id

@@ -48,6 +48,7 @@ public class JwtUtil {
         return Jwts.builder()
                 .subject(user.getUsername())
                 .claim("uid", user.getId())
+                .claim("pwdVer", user.getPwdVersion() == null ? 0 : user.getPwdVersion())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(ttl)))
                 .signWith(key)
@@ -64,5 +65,18 @@ public class JwtUtil {
     public String verify(String token) {
         return Jwts.parser().verifyWith(key).build()
                 .parseSignedClaims(token).getPayload().getSubject();
+    }
+
+    /**
+     * 从令牌取回密码版本（供过滤器比对）
+     *
+     * @param token JWT字符串
+     * @return 密码版本
+     * @throws io.jsonwebtoken.JwtException 令牌无效时抛出
+     */
+    public int passwordVersion(String token) {
+        Integer ver = Jwts.parser().verifyWith(key).build()
+                .parseSignedClaims(token).getPayload().get("pwdVer", Integer.class);
+        return ver == null ? 0 : ver;
     }
 }
