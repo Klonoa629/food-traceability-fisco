@@ -28,6 +28,9 @@ jobs:
       # types/artifacts 不入库，测试前需编译生成 TypeChain 类型
       - run: npm run compile
       - run: npm test
+      # 依赖漏洞扫描：仅告警不阻断
+      - run: npm audit --audit-level=high
+        continue-on-error: true
 
   backend:
     name: 后端测试
@@ -43,6 +46,9 @@ jobs:
           java-version: 17
           cache: gradle
       - run: ./gradlew test --no-daemon
+      # 镜像构建冒烟：Dockerfile 损坏时尽早暴露
+      - run: docker compose build
+        working-directory: deploy
 
   frontend:
     name: 前端构建
