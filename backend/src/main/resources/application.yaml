@@ -50,6 +50,10 @@ spring:
     url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/foodtrace?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
     password: "${FOODTRACE_DB_PASSWORD}"
+  flyway:
+    # 已有库按当前版本基线接入，新库从 V1 全量执行
+    baseline-on-migrate: true
+    baseline-version: 3
 
 management:
   endpoints:

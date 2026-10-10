@@ -28,12 +28,12 @@ wsl.exe bash -c "cd ~/fisco/webase-deploy && python3 deploy.py startAll"
 
 ```bash
 wsl.exe bash -c "mysql -uroot -p123456 -e 'CREATE DATABASE IF NOT EXISTS foodtrace DEFAULT CHARSET utf8mb4'"
-wsl.exe bash -c "mysql -uroot -p123456 foodtrace < /mnt/e/Study/Project/food-traceability-fisco/backend/src/main/resources/sql/init.sql"
 ```
 
-监管账户不走审批流：先通过注册接口建一个普通账户，再执行
-`bootstrap_regulator.sql` 把它提升为监管并绑定链上 regulator（脚本内地址
-已按本机 WeBASE-Sign 实例填好）。
+只需建库：表结构由后端启动时经 Flyway 自动创建与升级（脚本在
+`backend/src/main/resources/db/migration/`）。监管账户不走审批流：先通过
+注册接口建一个普通账户，再执行 `sql/bootstrap_regulator.sql` 把它提升为
+监管并绑定链上 regulator（脚本内地址已按本机 WeBASE-Sign 实例填好）。
 
 ### 3. 启动后端
 
@@ -86,7 +86,8 @@ cd deploy && cp .env.example .env && docker compose up -d --build
 ├── backend
 │   └── src/main/resources
 │       ├── abi/Foodtrace.abi        # 合约 ABI
-│       └── sql/                     # 建表与监管账户引导脚本
+│       ├── db/migration/            # Flyway 建表与升级脚本
+│       └── sql/                     # 监管账户引导脚本
 └── frontend        # Vue 3 前端
 ```
 
