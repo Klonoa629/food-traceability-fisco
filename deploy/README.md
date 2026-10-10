@@ -24,10 +24,14 @@
 `443:443`（可同时保留 80），`docker compose up -d` 重建生效。
 自签证书仅供演示，正式环境换机构签发证书。
 
-## 数据库备份与恢复
+## 数据库与存证备份
 
-备份由 WSL 内的 systemd timer 每日 03:30 触发（错过自动补跑），
-热备不锁表，备份带 SHA-256 校验文件，保留 14 天。安装：
+备份由 WSL 内的 systemd timer 每日 03:30 触发（错过自动补跑），两段独立：
+MySQL 热备（`--single-transaction`，带 SHA-256 校验文件，保留 14 天）与
+存证对象备份（`mc mirror` 镜像 MinIO bucket 内容，内容寻址只增不删，
+**不按时间清理**——旧对象对应链上历史哈希，须永久保留）。任一段失败 systemd 单元显示失败。
+
+备份前置：Docker Desktop 与 MinIO 容器在运行。安装：
 
     mkdir -p ~/opt/bin
     cp deploy/backup/backup-foodtrace.sh ~/opt/bin/ && chmod +x ~/opt/bin/backup-foodtrace.sh
@@ -36,16 +40,22 @@
     sudo cp deploy/backup/foodtrace-backup.{service,timer} /etc/systemd/system/
     sudo systemctl daemon-reload && sudo systemctl enable --now foodtrace-backup.timer
 
-手动备份与恢复（先核对校验和）：
+手动备份与恢复：
 
     ~/opt/bin/backup-foodtrace.sh
+    # MySQL
     cd ~/backups/foodtrace && sha256sum -c <备份文件>.sha256
     mysql -uroot -p -e "CREATE DATABASE foodtrace DEFAULT CHARSET utf8mb4"
     zcat <备份文件>.sql.gz | mysql -uroot -p foodtrace
+    # 存证（对象名即内容哈希，恢复后逐文件 sha256sum 比对文件名即完成校验）
+    docker run --rm --network foodtrace-net --entrypoint sh -v <备份目录>:/backup \
+      minio/mc -c 'mc alias set r http://<目标minio>:9000 <AK> <SK> && \
+                   mc mb --ignore-existing r/foodtrace-evidence && \
+                   mc mirror --overwrite /backup r/foodtrace-evidence'
 
 恢复后启动后端，调用 GET /api/admin/logs/verify-chain 确认审计哈希链完整。
-2026-10-10 已做过一次完整演练：删库恢复后行数一致、审计链完整续接、
-链上交易校验 36/36 通过。
+2026-10-10 双段演练：MySQL 删库恢复行数一致、审计链完整续接、链上校验
+36/36；存证恢复至影子实例后逐文件哈希与对象名全部一致。
 
 ## 存证对象存储
 
