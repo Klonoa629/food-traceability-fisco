@@ -118,7 +118,8 @@ Redis，缓存换分布式缓存或消息广播失效。
 - nginx 到后端、后端到 MySQL 与 WeBASE-Sign：明文，流量不出宿主机
   （Docker 与 WSL 内部网络）
 - 后端到 FISCO 节点：SDK 证书双向认证加密（backend/conf 下的
-  ca.crt、sdk.crt、sdk.key），联盟链原有机制
+  ca.crt、sdk.crt、sdk.key，不入库，运行时挂载进容器 /app/conf），
+  联盟链原有机制
 
 多机部署时再逐段补齐：后端启用 HTTPS 并将 nginx 反代改为 https，
 JDBC 连接加 useSSL，WeBASE-Sign 换其自带的 HTTPS 端口。

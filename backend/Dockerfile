@@ -10,6 +10,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /workspace/build/libs/*.jar app.jar
-COPY conf conf
+# SDK 证书（backend/conf，不入库）由 compose 在运行时挂载到 /app/conf
 EXPOSE 8081
 ENTRYPOINT ["java", "-jar", "app.jar"]
