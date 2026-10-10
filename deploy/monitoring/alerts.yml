@@ -1,0 +1,77 @@
+groups:
+  - name: foodtrace-critical
+    rules:
+      - alert: ExternalChainTransaction
+        expr: increase(chain_event_external_total[5m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "检测到未经后端的链上合约操作"
+          description: "过去 5 分钟内发现 {{ $value }} 笔外部交易，请核实操作来源。"
+
+      - alert: AuditChainBroken
+        expr: increase(audit_chain_broken_total[5m]) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: "审计哈希链校验不通过"
+          description: "审计记录可能被删除或篡改，立即核查 operate_log 表。"
+
+      - alert: RoleMismatch
+        expr: increase(reconcile_mismatch_total[10m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "角色对账发现不一致"
+          description: "有账户的库内角色与链上不一致，详见 ROLE_MISMATCH 审计。"
+
+  - name: foodtrace-availability
+    rules:
+      - alert: BackendDown
+        expr: up{job="foodtrace-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "后端不可达"
+
+      - alert: ChainNodeDown
+        expr: app_health{component="chain"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "FISCO BCOS 节点不可达"
+
+      - alert: SignServiceDown
+        expr: app_health{component="sign"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "WeBASE-Sign 不可达，所有链上写操作将失败"
+
+      - alert: StorageDown
+        expr: app_health{component="storage"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "存证存储不可达"
+
+  - name: foodtrace-performance
+    rules:
+      - alert: ChainRpcSlow
+        expr: histogram_quantile(0.99, rate(chain_rpc_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "链上查询 P99 延迟超过 2 秒"
+
+      - alert: RateLimitSpike
+        expr: increase(ratelimit_blocked_total[5m]) > 50
+        labels:
+          severity: info
+        annotations:
+          summary: "限流拦截量异常（5 分钟超 50 次）"

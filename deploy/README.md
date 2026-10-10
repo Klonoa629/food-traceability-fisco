@@ -5,6 +5,8 @@
 容器经 host.docker.internal 访问它们（Docker Desktop 的网关可直接
 到达宿主机与 WSL 的端口转发，无需额外配置）。
 
+Prometheus 抓取后端指标、Grafana 面板展示、告警规则见 monitoring/ 目录。
+
 ## 使用
 
     cd deploy
@@ -13,6 +15,22 @@
 
 浏览器打开 http://localhost:8080（WSL 里 WeBASE 的 nginx 已占用 80，
 故默认 8080，可用 .env 的 WEB_PORT 调整）。
+
+Grafana 面板：http://localhost:3000（默认 admin/admin，可用 .env 的
+GRAFANA_PASSWORD 调整）。数据源自动配置为 Prometheus，指标来自
+后端 /actuator/prometheus。
+
+## 告警规则
+
+monitoring/alerts.yml 定义了三组告警：
+
+- **critical**：外部链上交易（chain_event_external）、审计链断裂
+  （audit_chain_broken）、后端/节点/Sign 不可达（app_health / up）
+- **warning**：角色不一致（reconcile_mismatch）、存储不可达
+- **performance**：链上查询 P99 延迟超 2 秒、限流拦截量异常
+
+Prometheus 触发告警后可在 http://localhost:9090/alerts 查看；
+接通知渠道（邮件/钉钉/飞书）需在 Prometheus 侧配置 Alertmanager。
 
 ## 启用 TLS
 
