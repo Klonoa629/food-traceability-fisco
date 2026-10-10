@@ -29,8 +29,9 @@ monitoring/alerts.yml 定义了三组告警：
 - **warning**：角色不一致（reconcile_mismatch）、存储不可达
 - **performance**：链上查询 P99 延迟超 2 秒、限流拦截量异常
 
-Prometheus 触发告警后可在 http://localhost:9090/alerts 查看；
-接通知渠道（邮件/钉钉/飞书）需在 Prometheus 侧配置 Alertmanager。
+Prometheus 不对外发布端口（9090 仅容器网络内可达，指标经 Grafana 展示），
+需要查看告警列表时可临时加回 ports 映射。接通知渠道（邮件/钉钉/飞书）
+需在 Prometheus 侧配置 Alertmanager。
 
 ## 启用 TLS
 
