@@ -58,6 +58,25 @@ public class AuditAnchorTask {
             meterRegistry.counter("audit.anchor.error").increment();
             return;
         }
+        // 新锚必须延续已有锚，不能把整库重写后自洽的哈希链再次背书。
+        try {
+            ChainAnchorService.AnchorRecord latest = chainAnchorService.getLatestAnchor();
+            if (latest != null) {
+                String mismatch = verifySnapshot(rows, latest);
+                if (mismatch != null) {
+                    meterRegistry.counter("audit.anchor.error").increment();
+                    log.warn("审计锚定跳过：{}", mismatch);
+                    return;
+                }
+                if (latest.rowCount() == rowCount) {
+                    return;
+                }
+            }
+        } catch (Exception e) {
+            meterRegistry.counter("audit.anchor.error").increment();
+            log.warn("无法确认历史锚，停止写入新锚：{}", e.getMessage());
+            return;
+        }
         String headHash = rows.get(rows.size() - 1).getRowHash();
         String signUserId = regulatorSignUserId();
         if (signUserId == null) {
@@ -75,15 +94,16 @@ public class AuditAnchorTask {
         }
     }
 
+    /** 是否已配置锚定合约。 */
+    public boolean enabled() {
+        return chainAnchorService.configured();
+    }
+
     /**
      * 核验最新锚定对应的历史前缀，正常追加不影响结果
      *
      * @return 一致返回 null，不一致返回差异描述
      */
-    public boolean enabled() {
-        return chainAnchorService.configured();
-    }
-
     public String verifyAnchor() {
         if (!enabled()) {
             return "尚未配置审计锚定合约";
@@ -92,7 +112,11 @@ public class AuditAnchorTask {
         if (latest == null) {
             return "链上无锚定记录";
         }
-        List<OperateLog> rows = snapshot();
+        return verifySnapshot(snapshot(), latest);
+    }
+
+    /** 以同一快照比对历史前缀，避免校验和待锚数据来自不同查询。 */
+    private String verifySnapshot(List<OperateLog> rows, ChainAnchorService.AnchorRecord latest) {
         long anchoredCount = latest.rowCount();
         if (anchoredCount <= 0 || anchoredCount > rows.size()) {
             return "锚定行数异常：锚定时 " + anchoredCount + " 行，当前 " + rows.size() + " 行";

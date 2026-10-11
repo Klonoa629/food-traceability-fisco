@@ -104,6 +104,8 @@ class AuditAnchorTaskTest {
             prev = row.getRowHash();
         }
         assertThat(task.verifyAnchor()).contains("链头不一致");
+        task.anchor();
+        verify(chain, never()).anchor(anyString(), anyString(), anyLong());
     }
 
     @Test
@@ -134,5 +136,33 @@ class AuditAnchorTaskTest {
         verifyNoInteractions(logs, users);
         verify(chain, never()).anchor(anyString(), anyString(), anyLong());
         assertThat(task.verifyAnchor()).contains("尚未配置");
+    }
+
+    @Test
+    void unavailableHistoricalAnchorShouldBlockNewAnchor() {
+        when(logs.selectList(any())).thenReturn(rows(2));
+        when(chain.getLatestAnchor()).thenThrow(new IllegalStateException("链不可达"));
+        task.anchor();
+        verify(chain, never()).anchor(anyString(), anyString(), anyLong());
+    }
+
+    @Test
+    void unchangedSnapshotShouldNotWriteDuplicateAnchor() {
+        List<OperateLog> rows = rows(2);
+        anchored(rows, 2);
+        task.anchor();
+        verify(chain, never()).anchor(anyString(), anyString(), anyLong());
+    }
+
+    @Test
+    void appendedSnapshotShouldExtendExistingAnchor() {
+        List<OperateLog> rows = rows(3);
+        anchored(rows, 2);
+        SysUser regulator = new SysUser();
+        regulator.setSignUserId("regulator");
+        when(users.selectOne(any())).thenReturn(regulator);
+        task.anchor();
+        verify(chain).anchor("regulator", rows.get(2).getRowHash(), 3);
+        verify(logs, times(1)).selectList(any());
     }
 }
