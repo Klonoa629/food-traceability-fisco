@@ -20,4 +20,4 @@
     npm run compile
     npm test
 
-47 个用例，正常应该全过。
+目前覆盖 Foodtrace 状态机与权限、AuditAnchor 权限与历史快照；以测试命令实际结果为准。

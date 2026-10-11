@@ -46,6 +46,9 @@ jobs:
           java-version: 17
           cache: gradle
       - run: ./gradlew test --no-daemon
+      - name: 演示与测量脚本离线回归
+        run: python3 -B -m unittest discover -s scripts -p 'test_*.py'
+        working-directory: .
       # 镜像构建冒烟：Dockerfile 损坏时尽早暴露
       - run: docker compose build
         working-directory: deploy

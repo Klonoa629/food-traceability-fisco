@@ -1,107 +1,86 @@
 # 基于 FISCO BCOS 的食品溯源平台
 
-农产品从基地注册上链开始，沿加工、质检、运输、仓储、销售流转，每个环节
-的操作记录连同数据哈希写入 FISCO BCOS 联盟链，质检不合格或监管介入即进入
-召回终态。机构私钥统一托管在 WeBASE-Sign，后端只发起哈希签名，全程不接触
-私钥。
+农产品从基地注册上链，沿加工、质检、运输、仓储、销售流转，质检不合格或
+监管介入进入召回终态。机构签名密钥托管在 WeBASE-Sign；链上保存责任方、
+流转记录与内容摘要，文件原文保存在 MinIO。
 
 ## 技术栈
 
-- 合约：Solidity 0.8.11 + Hardhat（`blockchain/`）
-- 后端：Spring Boot 3.5 / Java 17 / MyBatis-Plus / MySQL（`backend/`）
-- 前端：Vue 3 / Vite / TypeScript / Element Plus（`frontend/`）
+- 合约：Solidity 0.8.11、Hardhat 3、TypeScript / node:test
+- 后端：Spring Boot 3.5、Java 17、MyBatis-Plus、MySQL、Flyway
+- 联盟链：FISCO BCOS v3、WeBASE-Sign
+- 前端：Vue 3、Vite、TypeScript、Element Plus
+- 部署与观测：Docker Compose、nginx、MinIO、Prometheus、Grafana
 
 ## 快速开始
 
-环境要求：JDK 17、Node.js 18+，WSL（Ubuntu-24.04）内已部署 WeBASE 3.1.1
-全套——FISCO 节点（:20200）、WeBASE-Sign（:5004）、MySQL（:3306，root/123456）。
+需要 JDK 17、Node.js 22.13+，以及已经准备好的 FISCO / WeBASE-Sign / MySQL / MinIO。
+本仓库不自动部署联盟链，也不自带可跨环境通用的合约地址、监管身份或演示密码。
+完整初始化顺序见 [从空业务库到演示](docs/demo.md)。
 
-### 1. 启动链环境
+1. 部署合约，准备 SDK 证书，设置实际合约地址和数据库、存储、JWT 环境变量。
+   参考 [后端变量示例](backend/.env.example) 与 [容器变量示例](deploy/.env.example)。
+2. 创建空的 `foodtrace` 库，由后端启动时执行 Flyway 迁移。
+   已有旧库的接管见 [部署说明](deploy/README.md)，不能直接假定其结构与 V1 相同。
+3. 启动后端（以下在 WSL / Linux，环境变量在当前终端设置）：
 
-```bash
-wsl.exe bash -c "cd ~/fisco/webase-deploy && python3 deploy.py startAll"
+   ```bash
+   cd backend
+   ./gradlew bootRun
+   ```
+
+4. 前端首次由维护者安装依赖后启动：
+
+   ```bash
+   cd frontend
+   npm ci
+   npm run dev
+   ```
+
+开发入口为 `http://localhost:5173`，Vite 将 `/api` 代理至后端 8081。
+容器入口默认 `http://localhost:8080`，打包、TLS 与备份步骤见 [部署说明](deploy/README.md)。
+首次监管账户需要绑定真实合约部署者；后续机构通过监管审批开户授权。
+
+## 演示与设计说明
+
+- [五分钟演示与数据初始化](docs/demo.md)：六类机构、正常销售及两种召回场景。
+- [架构与一致性边界](docs/architecture.md)：数据权威来源、写链恢复与状态图。
+- [读取性能测量](docs/performance.md)：测量脚本、统计口径与结果记录要求。
+
+```powershell
+# 默认只打印计划；实际写入演示数据需按文档配置凭据并显式加 --apply
+python -X utf8 -B scripts/demo.py --run-id showcase01
 ```
-
-停止用 `stopAll`。节点、Sign、MySQL 会一起拉起。
-
-### 2. 初始化数据库（首次）
-
-```bash
-wsl.exe bash -c "mysql -uroot -p123456 -e 'CREATE DATABASE IF NOT EXISTS foodtrace DEFAULT CHARSET utf8mb4'"
-```
-
-只需建库：表结构由后端启动时经 Flyway 自动创建与升级（脚本在
-`backend/src/main/resources/db/migration/`）。监管账户不走审批流：先通过
-注册接口建一个普通账户，再执行 `sql/bootstrap_regulator.sql` 把它提升为
-监管并绑定链上 regulator（脚本内地址已按本机 WeBASE-Sign 实例填好）。
-
-### 3. 启动后端
-
-```bash
-cd backend
-FOODTRACE_JWT_SECRET=<至少32字节的随机串> FOODTRACE_DB_PASSWORD=123456 ./gradlew bootRun
-```
-
-两个环境变量的说明见 `backend/.env.example`。从 Windows 访问后端用
-`http://localhost:8081`，不要用 127.0.0.1——后端跑在 WSL 内时端口转发
-可能只绑 IPv6。
-
-### 4. 启动前端
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-浏览器打开 `http://localhost:5173`，`/api` 已由 Vite 代理到后端，无需
-处理跨域。
-
-## 容器化部署
-
-前后端可打包为容器一键起（nginx 统一入口，TLS 可选），链环境仍在
-WSL 不进容器，见 [deploy/README.md](deploy/README.md)：
-
-```bash
-cd deploy && cp .env.example .env && docker compose up -d --build
-```
-
-## 演示账号
-
-| 用户名 | 密码 | 身份 |
-|---|---|---|
-| regulator | admin123456 | 监管机构 |
-| farm_a | pass123456 | 基地 |
-| inspector_b | pass123456 | 质检机构 |
-| transporter_c | pass123456 | 物流 |
-| retailer_d | pass123456 | 零售商 |
-
-链上已有产品「阳光草莓」（批次 B20260918-A1）走完种植到召回的完整
-生命周期，可直接用于演示。
 
 ## 目录结构
 
+```text
+├── blockchain      # Foodtrace / AuditAnchor 合约与测试
+├── backend         # API、链适配、迁移、审计与恢复任务
+├── frontend        # 机构工作台与免登录溯源查询
+├── deploy          # 容器、nginx、监控与备份
+├── scripts         # 演示数据、读取测量及离线回归
+└── docs            # 架构、演示、性能说明
 ```
-├── blockchain      # Foodtrace 溯源合约与测试
-├── backend
-│   └── src/main/resources
-│       ├── abi/Foodtrace.abi        # 合约 ABI
-│       ├── db/migration/            # Flyway 建表与升级脚本
-│       └── sql/                     # 监管账户引导脚本
-└── frontend        # Vue 3 前端
-```
-
-Foodtrace 合约部署在 `0x2af6160e266f763652f433a80b94fc13f4065303`，
-地址配置在 `backend/src/main/resources/application.yaml`。重新部署合约后
-需要更新该地址，并由监管重新给各机构发放链上角色。
 
 ## 测试
 
+在对应目录分别执行：
+
 ```bash
-cd blockchain && npm run compile && npm test  # 合约与锚定回归
-cd backend && ./gradlew test  # 后端回归（-Pintegration 需链环境）
-cd frontend && npm test && npm run lint && npm run build
+# blockchain
+npm run compile && npm test
+# backend
+./gradlew test
+# frontend
+npm test && npm run lint && npm run build
+# 仓库根目录
+python -B -m unittest discover -s scripts -p 'test_*.py'
 ```
+
+CI 包含合约、后端、脚本、前端检查、浏览器回归及镜像构建。
+单元测试和带 API 夹具的浏览器测试无需真实链；它们不能替代实际 FISCO、
+MySQL、MinIO 的部署联调。真实联调验收清单见演示文档。
 
 ## 写链幂等与故障恢复
 
