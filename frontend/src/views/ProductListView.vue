@@ -41,18 +41,21 @@ async function refreshHeight() {
   }
 }
 
+let loadVersion = 0
 async function load() {
+  const version = ++loadVersion
   loading.value = true
   try {
     const [ps, os] = await Promise.all([
-      listProducts({ page: page.value, size: size.value }),
+      listProducts({ page: page.value, size: size.value, ...filters }),
       listOrgs()
     ])
+    if (version !== loadVersion) return
     products.value = ps.records
     total.value = ps.total
     orgs.value = os
   } finally {
-    loading.value = false
+    if (version === loadVersion) loading.value = false
   }
 }
 
@@ -69,16 +72,21 @@ onMounted(() => {
 })
 onBeforeUnmount(() => { if (timer) clearInterval(timer) })
 
-// 搜索:按产品名称或批次号过滤
+// 筛选由后端完成，分页总数为全部匹配产品数。
 const keyword = ref('')
-const filteredProducts = computed(() => {
-  const kw = keyword.value.trim().toLowerCase()
-  if (!kw) return products.value
-  return products.value.filter(
-    (p) => p.name.toLowerCase().includes(kw) || p.batchNo.toLowerCase().includes(kw)
-  )
-})
-
+const filters = reactive<{ keyword?: string; stage?: number; holder?: string; recalled?: boolean }>({})
+function search() {
+  filters.keyword = keyword.value.trim() || undefined
+  resetPage()
+}
+function clearFilters() {
+  keyword.value = ''
+  filters.keyword = undefined
+  filters.stage = undefined
+  filters.holder = undefined
+  filters.recalled = undefined
+  resetPage()
+}
 // 注册产品
 const isFarm = computed(() => auth.user?.role === 1)
 const dialogVisible = ref(false)
@@ -106,6 +114,8 @@ async function submitCreate() {
     dialogVisible.value = false
     Object.assign(form, { name: '', batchNo: '', description: '', location: '', dataHash: '' })
     // 新产品排在最前，回到第一页可见
+    keyword.value = ''
+    Object.assign(filters, { keyword: undefined, stage: undefined, holder: undefined, recalled: undefined })
     page.value = 1
     await load()
   } finally {
@@ -134,23 +144,40 @@ function openDetail(p: ProductVO) {
         <el-input
           v-model="keyword"
           class="search-input"
-          placeholder="筛选当前页:产品名称 / 批次号"
+          placeholder="搜索全部产品：名称 / 批次号"
+          @keyup.enter="search"
+          @clear="search"
           clearable
           size="large"
         />
+        <el-button @click="search">搜索</el-button>
         <el-button v-if="isFarm" type="primary" size="large" @click="dialogVisible = true">
           + 注册产品
         </el-button>
       </div>
     </div>
 
+    <div class="filters">
+      <el-select v-model="filters.stage" placeholder="全部环节" aria-label="环节筛选" clearable @change="search">
+        <el-option v-for="(name, stage) in STAGE_NAMES" :key="stage" :label="name" :value="Number(stage)" />
+      </el-select>
+      <el-select v-model="filters.holder" placeholder="全部持有机构" aria-label="持有机构筛选" clearable @change="search">
+        <el-option v-for="org in orgs.filter(o => o.chainAddress)" :key="org.id" :label="org.orgName" :value="org.chainAddress" />
+      </el-select>
+      <el-select v-model="filters.recalled" placeholder="全部召回状态" aria-label="召回状态筛选" clearable @change="search">
+        <el-option label="未召回" :value="false" />
+        <el-option label="已召回" :value="true" />
+      </el-select>
+      <el-button @click="clearFilters">重置筛选</el-button>
+    </div>
+
     <el-skeleton v-if="loading" :rows="6" animated />
 
-    <el-empty v-else-if="!filteredProducts.length" :description="keyword ? '没有匹配的产品' : '暂无产品'" />
+    <el-empty v-else-if="!products.length" :description="keyword ? '没有匹配的产品' : '暂无产品'" />
 
     <div v-else class="product-grid">
       <div
-        v-for="p in filteredProducts"
+        v-for="p in products"
         :key="p.id"
         class="product-card ft-card"
         :class="{ recalled: p.recalled }"
@@ -172,10 +199,11 @@ function openDetail(p: ProductVO) {
     </div>
 
     <el-pagination
-      v-if="total > 0 && !keyword"
+      v-if="total > 0"
       class="product-pager"
       background
-      layout="total, sizes, prev, pager, next"
+      layout="total, prev, pager, next"
+      :pager-count="5"
       :total="total"
       :page-sizes="[10, 20, 50, 100]"
       v-model:current-page="page"
@@ -184,7 +212,7 @@ function openDetail(p: ProductVO) {
       @size-change="resetPage"
     />
 
-    <el-dialog v-model="dialogVisible" title="注册产品(上链)" width="480px" :close-on-click-modal="false">
+    <el-dialog v-model="dialogVisible" title="注册产品(上链)" width="min(480px, 94vw)" :close-on-click-modal="false">
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
         <el-form-item label="产品名称" prop="name">
           <el-input v-model="form.name" placeholder="如:阳光草莓" />
@@ -264,4 +292,14 @@ function openDetail(p: ProductVO) {
 .pc-row { display: flex; justify-content: space-between; align-items: baseline; }
 .pc-row .muted { font-size: 14px; }
 .pc-row b { font-weight: 600; }
+.filters { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+.filters .el-select { width: 180px; }
+@media (max-width: 600px) {
+  .page-head { align-items: stretch; flex-direction: column; gap: 12px; }
+  .page-head-right { flex-wrap: wrap; }
+  .search-input { width: 100%; }
+  .filters .el-select { width: 100%; }
+  .product-grid { grid-template-columns: minmax(0, 1fr); }
+  .product-pager { justify-content: center; flex-wrap: wrap; }
+}
 </style>

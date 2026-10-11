@@ -44,8 +44,12 @@ public class ProductController {
      */
     @GetMapping
     public Result<PageVO<ProductVO>> list(@RequestParam(defaultValue = "1") int page,
-                                          @RequestParam(defaultValue = "20") int size) {
-        return Result.ok(productService.list(page, size));
+                                          @RequestParam(defaultValue = "20") int size,
+                                          @RequestParam(required = false) String keyword,
+                                          @RequestParam(required = false) Integer stage,
+                                          @RequestParam(required = false) String holder,
+                                          @RequestParam(required = false) Boolean recalled) {
+        return Result.ok(productService.list(page, size, keyword, stage, holder, recalled));
     }
 
     /**

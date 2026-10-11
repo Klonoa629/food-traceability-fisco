@@ -147,3 +147,10 @@ cd frontend && npm test && npm run lint && npm run build
 本机有 Playwright Core 时可运行 `npm run test:browser`；依赖在其他目录时设置
 `PLAYWRIGHT_MODULE` 为模块绝对路径，使用已有浏览器可设置 `E2E_BROWSER_PATH`。
 该脚本启动并关闭独立的 5174 端口预览服务，截图默认保存在系统临时目录。
+## 产品检索
+
+`GET /api/products` 支持 `keyword`（名称/批次号，不区分大小写）、`stage`（0–6）、
+`holder`（当前持有机构链地址）和 `recalled`（true/false），条件组合取交集。
+先筛选全部产品，再按 id 倒序分页；`total` 是匹配总数，搜索结果可以继续翻页。
+无筛选条件时只读取当前页。筛选目前遍历产品读缓存，冷缓存可能需要多次链读取，
+适合小规模演示；大规模数据应增加事件驱动的数据库查询索引，不能据此宣称高吞吐检索。

@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 
 /**
  * 产品溯源业务服务
@@ -232,6 +233,42 @@ public class ProductService {
             products.add(productCache.get(id));
         }
         return new PageVO<>(products, total, safePage, safeSize);
+    }
+
+    /**
+     * 按全量产品筛选后分页；无条件时保留按 id 截取的快速路径。
+     * 当前筛选走链读缓存，成本随产品总量增长，后续可替换为事件驱动查询索引。
+     */
+    public PageVO<ProductVO> list(int page, int size, String keyword, Integer stage,
+                                  String holder, Boolean recalled) {
+        String kw = keyword == null ? "" : keyword.trim().toLowerCase(Locale.ROOT);
+        String owner = holder == null ? "" : holder.trim();
+        if (kw.length() > 128 || owner.length() > 128 || (stage != null && (stage < 0 || stage > 6))) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "筛选条件不合法");
+        }
+        if (kw.isEmpty() && stage == null && owner.isEmpty() && recalled == null) {
+            return list(page, size);
+        }
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        long safePage = Math.max(page, 1);
+        long offset = (safePage - 1) * safeSize;
+        long matched = 0;
+        List<ProductVO> selected = new ArrayList<>();
+        for (long id = chainReader.productCount(); id >= 1; id--) {
+            ProductVO product = productCache.get(id);
+            if ((!kw.isEmpty() && !product.name().toLowerCase(Locale.ROOT).contains(kw)
+                    && !product.batchNo().toLowerCase(Locale.ROOT).contains(kw))
+                    || (stage != null && stage != product.stage())
+                    || (!owner.isEmpty() && !owner.equalsIgnoreCase(product.currentHolder()))
+                    || (recalled != null && recalled != product.recalled())) {
+                continue;
+            }
+            if (matched >= offset && selected.size() < safeSize) {
+                selected.add(product);
+            }
+            matched++;
+        }
+        return new PageVO<>(selected, matched, safePage, safeSize);
     }
 
     /**

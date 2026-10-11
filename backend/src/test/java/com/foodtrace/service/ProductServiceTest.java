@@ -180,4 +180,36 @@ class ProductServiceTest {
                 6, 5  // 零售 -> 销售
         ));
     }
+
+    @Test
+    void filterShouldSearchAcrossPagesAndCountBeforePagination() {
+        when(chainReader.productCount()).thenReturn(4L);
+        when(productCache.get(anyLong())).thenAnswer(invocation -> {
+            long id = invocation.getArgument(0);
+            return new ProductVO(id, id == 4 ? "苹果" : "草莓", "B" + id,
+                    "0xfarm", "0xfarm", 0, false, List.of());
+        });
+        var result = productService.list(2, 2, "草莓", 0, "0xFARM", false);
+        assertThat(result.total()).isEqualTo(3);
+        assertThat(result.records()).extracting(ProductVO::id).containsExactly(1L);
+        assertThat(productService.list(1, 2, "b1", null, null, null).records())
+                .extracting(ProductVO::id).containsExactly(1L);
+        assertThat(productService.list(1, 2, null, null, null, true).records()).isEmpty();
+    }
+
+    @Test
+    void emptyFilterShouldKeepDirectPageRead() {
+        when(chainReader.productCount()).thenReturn(100L);
+        when(productCache.get(100L)).thenReturn(product(100, 0));
+        var result = productService.list(1, 1, " ", null, null, null);
+        assertThat(result.total()).isEqualTo(100);
+        verify(productCache, times(1)).get(anyLong());
+    }
+
+    @Test
+    void invalidFilterShouldNotReadChain() {
+        assertThatThrownBy(() -> productService.list(1, 20, null, 7, null, null))
+                .isInstanceOf(BizException.class);
+        verifyNoInteractions(chainReader, productCache);
+    }
 }

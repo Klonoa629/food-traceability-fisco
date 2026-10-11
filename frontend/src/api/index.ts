@@ -10,7 +10,7 @@ export const register = (data: { username: string; password: string; orgName: st
   unwrap<number>(http.post<Result<number>>('/auth/register', data))
 
 // 业务
-export const listProducts = (params?: { page?: number; size?: number }) =>
+export const listProducts = (params?: { page?: number; size?: number; keyword?: string; stage?: number; holder?: string; recalled?: boolean }) =>
   unwrap<PageVO<ProductVO>>(http.get<Result<PageVO<ProductVO>>>('/products', { params }))
 
 export const getProduct = (id: number | string) =>

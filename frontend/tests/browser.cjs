@@ -30,7 +30,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright-core')
  const bytes=Buffer.from('食品检测报告：合格');
  const hash=require('node:crypto').createHash('sha256').update(bytes).digest('hex');
  const product={id:1,name:'阳光草莓',batchNo:'QA-001',originFarm:'0xfarm',currentHolder:'0xinsp',stage:2,recalled:false,records:[{stage:0,operator:'0xfarm',location:'云南昆明',description:'首批采摘',timestamp:1791691200000,dataHash:'sha256:'+hash},{stage:2,operator:'0xinsp',location:'合肥检测中心',description:'农残检测合格',timestamp:1791694800000,dataHash:'file:sha256:'+hash},{stage:1,operator:'0xprocessing',location:'昆明',description:'旧版记录',timestamp:1791692400000,dataHash:hash}]};
- let mode='ok',submitted=null;
+ let mode='ok',submitted=null, listQuery=null;
  await page.route('**/api/**',async route=>{
  const url=new URL(route.request().url());
  // Vite 源码模块 /src/api/ 不属于后端请求。
@@ -39,6 +39,12 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright-core')
  if(url.pathname==='/api/storage/upload')data={sha256:hash,filename:'报告.txt',size:bytes.length};
  else if(url.pathname.startsWith('/api/storage/'))return route.fulfill({status:mode==='missing'?404:200,contentType:'application/octet-stream',body:mode==='tampered'?Buffer.from('tampered'):bytes});
  else if(url.pathname==='/api/orgs') data=[];
+ else if(url.pathname==='/api/products') {
+   listQuery=Object.fromEntries(url.searchParams);
+   const current=Number(listQuery.page || 1);
+   const searching=listQuery.keyword === '草莓';
+   data={records:searching ? (current===1 ? [{...product,name:'跨页草莓'}] : [{...product,name:'第二页草莓'}]) : [{...product,name:'初始苹果'}],total:searching?21:1,current,size:20};
+ }
  else if(url.pathname.endsWith('/inspect'))submitted=route.request().postDataJSON();
  await route.fulfill({json:{code:0,data,message:'ok'}});
  });
@@ -79,6 +85,28 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright-core')
  assert.equal(await page.locator('vite-error-overlay').count(),0);
  assert.deepEqual(errors,[]);
  console.log({inspect:'pass',errors});
+ await page.goto('http://127.0.0.1:5174/');
+ await page.getByRole('heading',{name:'初始苹果'}).waitFor();
+ await page.getByPlaceholder('搜索全部产品：名称 / 批次号').fill('草莓');
+ await page.getByRole('button',{name:'搜索',exact:true}).click();
+ await page.getByRole('heading',{name:'跨页草莓'}).waitFor();
+ assert.equal(listQuery.keyword,'草莓');
+ await page.locator('.el-pager li').filter({hasText:/^2$/}).click();
+ await page.getByRole('heading',{name:'第二页草莓'}).waitFor();
+ assert.equal(listQuery.page,'2');
+ await page.locator('.el-select').filter({has:page.getByRole('combobox',{name:'环节筛选'})}).click();
+ await page.getByRole('option',{name:'质检',exact:true}).click();
+ await page.getByRole('heading',{name:'跨页草莓'}).waitFor();
+ assert.equal(listQuery.stage,'2');
+ assert.equal(listQuery.page,'1');
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ await page.screenshot({path:out+'products-mobile.png',fullPage:true});
+ await page.getByRole('button',{name:'重置筛选'}).click();
+ await page.getByRole('heading',{name:'初始苹果'}).waitFor();
+ assert.equal(listQuery.keyword,undefined);
+ assert.equal(listQuery.stage,undefined);
+ assert.deepEqual(errors,[]);
+ console.log('cross-page search and filter reset: pass');
  } catch (error) {
    if (page) await page.screenshot({path:out+'failure.png',fullPage:true}).catch(() => {});
    throw error;
