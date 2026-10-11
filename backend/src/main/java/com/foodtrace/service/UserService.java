@@ -163,7 +163,7 @@ public class UserService {
      * @return 生效后的账户信息
      * @throws BizException 账户不存在、状态不符、开户或上链失败时抛出
      */
-    public UserInfo approve(Long id, int role, LoginUser operator) {
+    public synchronized UserInfo approve(Long id, int role, LoginUser operator) {
         try {
             return doApprove(id, role, operator);
         } catch (BizException e) {
@@ -175,6 +175,9 @@ public class UserService {
 
     private UserInfo doApprove(Long id, int role, LoginUser operator) {
         SysUser user = requireUser(id);
+        if (user.getStatus() == 1 && user.getRole() == role) {
+            return UserInfo.from(user);
+        }
         if (user.getStatus() != 0) {
             throw new BizException(ErrorCode.INVALID_STATE, "仅待审批账户可通过审批");
         }
@@ -184,8 +187,20 @@ public class UserService {
         if (operator.signUserId() == null) {
             throw new BizException(ErrorCode.INVALID_STATE, "当前监管账户未绑定签名用户");
         }
+        if (user.getChainAddress() != null && user.getRole() != role) {
+            throw new BizException(ErrorCode.INVALID_STATE, "已有审批待确认，请先核对原角色的链上结果");
+        }
         // 1. WeBASE-Sign 开托管户，取得链上地址
         SignClient.SignUser signUser = signClient.createOrGet(SIGN_USER_PREFIX + user.getUsername());
+        // 广播前保存开户身份与审批意图；即使后续数据库回填失败，对账仍可找到该账户
+        SysUser identity = new SysUser();
+        identity.setId(id);
+        identity.setChainAddress(signUser.address());
+        identity.setSignUserId(signUser.signUserId());
+        identity.setRole(role);
+        if (userMapper.updateById(identity) != 1) {
+            throw new IllegalStateException("审批身份未保存，尚未发起链上授权");
+        }
         // 2. 以审批监管人身份在链上发放角色；已持有同角色时跳过，保证重试幂等
         String txHash = null;
         if (readChainRole(signUser.address()) != role) {
@@ -211,7 +226,7 @@ public class UserService {
      * @return 吊销后的账户信息
      * @throws BizException 账户不存在、状态不符、名下有在途产品或吊销自己时抛出
      */
-    public UserInfo revoke(Long id, LoginUser operator) {
+    public synchronized UserInfo revoke(Long id, LoginUser operator) {
         if (id.equals(operator.id())) {
             throw new BizException(ErrorCode.PARAM_ERROR, "不能吊销当前登录账户");
         }
@@ -226,6 +241,9 @@ public class UserService {
 
     private UserInfo doRevoke(Long id, LoginUser operator) {
         SysUser user = requireUser(id);
+        if (user.getStatus() == 2) {
+            return UserInfo.from(user);
+        }
         if (user.getStatus() != 1) {
             throw new BizException(ErrorCode.INVALID_STATE, "仅生效账户可吊销");
         }

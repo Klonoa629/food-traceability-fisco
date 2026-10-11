@@ -32,6 +32,7 @@ class AuditAnchorTaskTest {
 
     @BeforeEach
     void setUp() {
+        when(chain.configured()).thenReturn(true);
         task = new AuditAnchorTask(logs, users, chain, hashes, new SimpleMeterRegistry());
     }
 
@@ -123,6 +124,15 @@ class AuditAnchorTaskTest {
         rows.get(1).setRowHash(null);
         when(logs.selectList(any())).thenReturn(rows);
         task.anchor();
-        verifyNoInteractions(chain);
+        verify(chain, never()).anchor(anyString(), anyString(), anyLong());
+    }
+
+    @Test
+    void disabledAnchorShouldNotPrepareOrSendTransaction() {
+        when(chain.configured()).thenReturn(false);
+        task.anchor();
+        verifyNoInteractions(logs, users);
+        verify(chain, never()).anchor(anyString(), anyString(), anyLong());
+        assertThat(task.verifyAnchor()).contains("尚未配置");
     }
 }

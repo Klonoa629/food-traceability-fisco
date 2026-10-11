@@ -44,6 +44,9 @@ public class AuditAnchorTask {
      */
     @Scheduled(fixedDelayString = "${foodtrace.anchor-interval-ms:600000}")
     public void anchor() {
+        if (!enabled()) {
+            return;
+        }
         List<OperateLog> rows = snapshot();
         if (rows.isEmpty()) {
             return;
@@ -77,7 +80,14 @@ public class AuditAnchorTask {
      *
      * @return 一致返回 null，不一致返回差异描述
      */
+    public boolean enabled() {
+        return chainAnchorService.configured();
+    }
+
     public String verifyAnchor() {
+        if (!enabled()) {
+            return "尚未配置审计锚定合约";
+        }
         ChainAnchorService.AnchorRecord latest = chainAnchorService.getLatestAnchor();
         if (latest == null) {
             return "链上无锚定记录";

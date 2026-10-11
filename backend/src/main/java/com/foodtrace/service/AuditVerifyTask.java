@@ -55,6 +55,9 @@ public class AuditVerifyTask {
      * 校验链上锚定与当前链头的一致性
      */
     private void verifyAnchor() {
+        if (!auditAnchorTask.enabled()) {
+            return;
+        }
         try {
             String mismatch = auditAnchorTask.verifyAnchor();
             if (mismatch != null) {

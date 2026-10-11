@@ -1,6 +1,7 @@
 package com.foodtrace.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.foodtrace.chain.ChainReader;
 import com.foodtrace.entity.SysUser;
 import com.foodtrace.mapper.SysUserMapper;
@@ -17,7 +18,7 @@ import java.util.List;
  *
  * <p>周期性比对库内角色与链上角色是否一致：生效账户期望等于
  * sys_user.role，已吊销账户期望为 0。发现不一致只记录告警日志与
- * ROLE_MISMATCH 审计，不自动修正——以哪一侧为准需人工判定。
+ * ROLE_MISMATCH 审计；仅对已保存审批意图且链上授权匹配的待审批账户补齐生效状态。
  *
  * @author Microft0629
  * @since 2026-10-06
@@ -70,6 +71,22 @@ public class RoleReconcileTask {
      * @return 是否不一致
      */
     private boolean checkUser(SysUser user, int chainRole) {
+        // 已保存审批身份且链上角色与审批意图一致，仅补齐数据库状态，不再发交易。
+        if (Integer.valueOf(0).equals(user.getStatus()) && user.getSignUserId() != null
+                && chainRole > 0 && Integer.valueOf(chainRole).equals(user.getRole())) {
+            SysUser completed = new SysUser();
+            completed.setId(user.getId());
+            completed.setStatus(1);
+            int updated = userMapper.update(completed, new LambdaUpdateWrapper<SysUser>()
+                    .eq(SysUser::getId, user.getId()).eq(SysUser::getStatus, 0)
+                    .eq(SysUser::getRole, chainRole).eq(SysUser::getSignUserId, user.getSignUserId()));
+            if (updated == 0) {
+                return false; // 审批状态已被其他请求推进，下轮再核对
+            }
+            operateLogService.record(0L, "system", "APPROVE_USER_RECOVERED", user.getId(),
+                    null, "已按链上结果恢复审批：" + user.getUsername());
+            return false;
+        }
         int expected = Integer.valueOf(1).equals(user.getStatus())
                 ? user.getRole() : 0;
         if (chainRole == expected) {

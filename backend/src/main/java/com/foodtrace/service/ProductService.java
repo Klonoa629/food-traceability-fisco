@@ -64,7 +64,7 @@ public class ProductService {
             return doRegister(request, user);
         } catch (BizException e) {
             operateLogService.record(user.id(), user.username(),
-                    "REGISTER_PRODUCT_FAILED", null, null, e.getMessage());
+                    (e.getCode() == ErrorCode.CHAIN_PENDING.getCode() ? "REGISTER_PRODUCT_PENDING" : "REGISTER_PRODUCT_FAILED"), null, null, e.getMessage());
             throw e;
         }
     }
@@ -96,7 +96,7 @@ public class ProductService {
         try {
             return doAddRecord(productId, request, user);
         } catch (BizException e) {
-            audit(user, "ADD_RECORD_FAILED", productId, null, e.getMessage());
+            audit(user, (e.getCode() == ErrorCode.CHAIN_PENDING.getCode() ? "ADD_RECORD_PENDING" : "ADD_RECORD_FAILED"), productId, null, e.getMessage());
             throw e;
         }
     }
@@ -126,7 +126,7 @@ public class ProductService {
         try {
             return doHandOver(productId, request, user);
         } catch (BizException e) {
-            audit(user, "HANDOVER_FAILED", productId, null, e.getMessage());
+            audit(user, (e.getCode() == ErrorCode.CHAIN_PENDING.getCode() ? "HANDOVER_PENDING" : "HANDOVER_FAILED"), productId, null, e.getMessage());
             throw e;
         }
     }
@@ -151,7 +151,7 @@ public class ProductService {
         try {
             return doInspect(productId, request, user);
         } catch (BizException e) {
-            audit(user, "INSPECT_FAILED", productId, null, e.getMessage());
+            audit(user, (e.getCode() == ErrorCode.CHAIN_PENDING.getCode() ? "INSPECT_PENDING" : "INSPECT_FAILED"), productId, null, e.getMessage());
             throw e;
         }
     }
@@ -180,7 +180,7 @@ public class ProductService {
         try {
             return doRecall(productId, request, operator);
         } catch (BizException e) {
-            audit(operator, "RECALL_FAILED", productId, null, e.getMessage());
+            audit(operator, (e.getCode() == ErrorCode.CHAIN_PENDING.getCode() ? "RECALL_PENDING" : "RECALL_FAILED"), productId, null, e.getMessage());
             throw e;
         }
     }

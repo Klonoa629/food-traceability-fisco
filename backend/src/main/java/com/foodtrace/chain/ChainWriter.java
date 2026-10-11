@@ -1,8 +1,8 @@
 package com.foodtrace.chain;
 
 import org.fisco.bcos.sdk.v3.BcosSDK;
+import com.foodtrace.common.BizException;
 import org.fisco.bcos.sdk.v3.client.Client;
-import org.fisco.bcos.sdk.v3.client.protocol.response.BcosTransactionReceipt;
 import org.fisco.bcos.sdk.v3.crypto.CryptoSuite;
 import org.fisco.bcos.sdk.v3.crypto.signature.ECDSASignatureResult;
 import org.fisco.bcos.sdk.v3.model.CryptoType;
@@ -44,10 +44,11 @@ public class ChainWriter {
     private final SignClient signClient;
     /** 指标注册表 */
     private final MeterRegistry meterRegistry;
+    private final ChainOperationJournal journal;
 
     public ChainWriter(BcosSDK bcosSDK, Client client, RemoteSignProvider signProvider,
                        SignClient signClient, @Value("${fisco.group-id}") String groupId,
-                       MeterRegistry meterRegistry) {
+                       MeterRegistry meterRegistry, ChainOperationJournal journal) {
         this.client = client;
         this.cryptoSuite = new CryptoSuite(CryptoType.ECDSA_TYPE, bcosSDK.getConfig());
         this.encoder = new TransactionEncoderService(cryptoSuite);
@@ -58,6 +59,7 @@ public class ChainWriter {
         this.signProvider = signProvider;
         this.signClient = signClient;
         this.meterRegistry = meterRegistry;
+        this.journal = journal;
     }
 
     /** 近期自有交易哈希（供事件订阅区分内外部交易），有界防止增长 */
@@ -83,30 +85,37 @@ public class ChainWriter {
         Timer.Sample sample = Timer.start(meterRegistry);
         String outcome = "success";
         try {
-            // 组装交易
-            long handle = assembler.getRawTransaction(contractAddress, abi, method, args);
-            // 取未签名交易的交易哈希，交由 Sign 托管身份签名
-            byte[] hash = encoder.encodeAndHashBytes(handle);
-            String txHash = Hex.toHexStringWithPrefix(hash);
-            // 广播前登记为自有交易：事件订阅据此跳过本方交易的重复审计
-            markOwn(txHash);
-            String sigHex = signClient.signMessageHash(signUserId, txHash);
-            // 解析签名
-            byte[] sig = Numeric.hexStringToByteArray(sigHex);
-            ECDSASignatureResult signature = new ECDSASignatureResult(sig[0],
-                    Arrays.copyOfRange(sig, 1, 33), Arrays.copyOfRange(sig, 33, 65));
-            // 回填签名得到最终交易，广播并等待回执
-            byte[] signedTx = encoder.encodeToTransactionBytes(
-                    handle, signature, cryptoSuite.getCryptoTypeConfig());
-            BcosTransactionReceipt bcosReceipt =
-                    client.sendTransaction(Hex.toHexStringWithPrefix(signedTx), false);
-            TransactionReceipt receipt = bcosReceipt.getTransactionReceipt();
-            if (receipt == null) {
-                throw new IllegalStateException("交易未上链");
-            }
+            TransactionReceipt receipt = journal.execute(signUserId, contractAddress, method, args, () -> {
+                try {
+                    // 组装交易
+                    long handle = assembler.getRawTransaction(contractAddress, abi, method, args);
+                    // 取未签名交易的交易哈希，交由 Sign 托管身份签名
+                    byte[] hash = encoder.encodeAndHashBytes(handle);
+                    String txHash = Hex.toHexStringWithPrefix(hash);
+                    // 广播前登记为自有交易：事件订阅据此标识交易来源
+                    markOwn(txHash);
+                    String sigHex = signClient.signMessageHash(signUserId, txHash);
+                    // 解析签名
+                    byte[] sig = Numeric.hexStringToByteArray(sigHex);
+                    ECDSASignatureResult signature = new ECDSASignatureResult(sig[0],
+                            Arrays.copyOfRange(sig, 1, 33), Arrays.copyOfRange(sig, 33, 65));
+                    // 回填签名得到最终交易，广播并等待回执
+                    byte[] signedTx = encoder.encodeToTransactionBytes(
+                            handle, signature, cryptoSuite.getCryptoTypeConfig());
+                    return new ChainOperationJournal.SignedTransaction(
+                            txHash, Hex.toHexStringWithPrefix(signedTx));
+                } catch (Exception e) {
+                    throw new IllegalStateException("组装签名交易失败", e);
+                }
+            });
+            markOwn(receipt.getTransactionHash());
+            if (receipt.getStatus() != 0) outcome = "rejected";
             log.info("上链完成 txHash={} status={}",
                     receipt.getTransactionHash(), receipt.getStatus());
             return receipt;
+        } catch (BizException e) {
+            outcome = "error";
+            throw e;
         } catch (Exception e) {
             outcome = "error";
             throw new IllegalStateException("写链失败: " + e.getMessage(), e);
@@ -141,6 +150,6 @@ public class ChainWriter {
      * @return 自有返回 true
      */
     public boolean isOwn(String txHash) {
-        return txHash != null && ownTxSet.contains(txHash);
+        return txHash != null && (ownTxSet.contains(txHash) || journal.isKnownTransaction(txHash));
     }
 }

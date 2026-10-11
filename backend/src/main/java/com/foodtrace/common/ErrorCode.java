@@ -22,6 +22,10 @@ public enum ErrorCode {
     TOO_MANY_REQUESTS(429, "请求过于频繁"),
     /** 参数错误 */
     PARAM_ERROR(400, "参数错误"),
+    /** 回执已明确拒绝，可修正业务条件后重新提交 */
+    CHAIN_REVERTED(422, "链上交易执行失败"),
+    /** 广播或回读中断，必须用原请求标识恢复 */
+    CHAIN_PENDING(503, "交易结果待确认"),
     /** 链上交易被拒绝 */
     CHAIN_REJECTED(502, "链上交易被拒绝");
 

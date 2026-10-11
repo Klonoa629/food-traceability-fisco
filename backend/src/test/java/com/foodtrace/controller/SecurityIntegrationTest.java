@@ -79,6 +79,8 @@ class SecurityIntegrationTest {
     private ProductCache productCache;
     @MockitoBean
     private StorageService storageService;
+    @MockitoBean
+    private com.foodtrace.mapper.ChainOperationMapper chainOperationMapper;
 
     /**
      * 构造指定身份与状态的账户实体

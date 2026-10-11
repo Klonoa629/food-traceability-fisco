@@ -103,4 +103,17 @@ class RoleReconcileTaskTest {
         verify(operateLogService, never()).record(anyLong(), anyString(), anyString(),
                 any(), any(), any());
     }
+
+    @Test
+    void approvedChainRoleShouldRecoverPendingDatabaseState() {
+        SysUser pending = user(2L, "farm_a", 1, 0);
+        pending.setSignUserId("ft_farm_a");
+        when(userMapper.selectList(any())).thenReturn(List.of(pending));
+        when(chainReader.roles(anyString())).thenReturn(1);
+        when(userMapper.update(any(SysUser.class), any())).thenReturn(1);
+        task.reconcile();
+        verify(userMapper).update(argThat((SysUser row) -> row.getStatus() == 1), any());
+        verify(operateLogService).record(eq(0L), eq("system"), eq("APPROVE_USER_RECOVERED"),
+                eq(2L), isNull(), anyString());
+    }
 }

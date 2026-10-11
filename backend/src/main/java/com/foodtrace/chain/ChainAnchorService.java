@@ -88,6 +88,10 @@ public class ChainAnchorService {
      *
      * @return 总数，合约未配置返回 -1
      */
+    public boolean configured() {
+        return contractAddress != null && !contractAddress.isBlank();
+    }
+
     public long anchorCount() {
         if (contractAddress == null || contractAddress.isBlank()) {
             return -1;

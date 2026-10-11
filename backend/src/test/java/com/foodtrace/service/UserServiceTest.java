@@ -64,6 +64,7 @@ class UserServiceTest {
      */
     @BeforeEach
     void setUp() {
+        lenient().when(userMapper.updateById(any(SysUser.class))).thenReturn(1);
         userService = new UserService(userMapper, operateLogService, passwordEncoder,
                 jwtUtil, signClient, chainRoleService, chainReader, productService,
                 rateLimitService);
@@ -231,5 +232,29 @@ class UserServiceTest {
                 && passwordEncoder.matches("newpass1a", u.getPasswordHash())));
         verify(operateLogService).record(eq(1L), eq("regulator"),
                 eq("PASSWORD_CHANGED"), eq(1L), isNull(), anyString());
+    }
+
+    @Test
+    void approveShouldPersistIdentityBeforeBroadcast() {
+        when(userMapper.selectById(2L)).thenReturn(user(0));
+        when(signClient.createOrGet("ft_farm_a"))
+                .thenReturn(new SignClient.SignUser("ft_farm_a", "0xfarm"));
+        when(chainRoleService.grantRole(anyString(), anyString(), anyInt()))
+                .thenThrow(new IllegalStateException("链路中断"));
+        assertThatThrownBy(() -> userService.approve(2L, 1, regulator)).isInstanceOf(IllegalStateException.class);
+        var ordered = inOrder(userMapper, chainRoleService);
+        ordered.verify(userMapper).updateById(argThat((SysUser row) ->
+                "0xfarm".equals(row.getChainAddress()) && row.getStatus() == null));
+        ordered.verify(chainRoleService).grantRole("regulator_001", "0xfarm", 1);
+    }
+
+    @Test
+    void failedIdentityPersistenceShouldPreventGrant() {
+        when(userMapper.selectById(2L)).thenReturn(user(0));
+        when(signClient.createOrGet("ft_farm_a"))
+                .thenReturn(new SignClient.SignUser("ft_farm_a", "0xfarm"));
+        when(userMapper.updateById(any(SysUser.class))).thenReturn(0);
+        assertThatThrownBy(() -> userService.approve(2L, 1, regulator)).isInstanceOf(IllegalStateException.class);
+        verifyNoInteractions(chainRoleService);
     }
 }

@@ -83,6 +83,10 @@ public class OperateLogService {
     public synchronized void record(Long userId, String username, String action,
                                     Long targetId, String chainTxHash, String detail) {
         try {
+            if (chainTxHash != null && operateLogMapper.selectCount(new LambdaQueryWrapper<OperateLog>()
+                    .eq(OperateLog::getChainTxHash, chainTxHash).eq(OperateLog::getAction, action)) > 0) {
+                return;
+            }
             append(userId, username, action, targetId, chainTxHash, detail);
         } catch (Exception e) {
             log.error("审计写入失败 action={} userId={}", action, userId, e);

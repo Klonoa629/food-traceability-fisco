@@ -136,7 +136,7 @@ public class ChainProductService {
         TransactionReceipt receipt = chainWriter.send(signUserId, contractAddress, abi, method, args);
         // SDK 的回执状态是 int 型，0 表示成功；失败时还原 revert 具体原因
         if (receipt == null || receipt.getStatus() != 0) {
-            throw new BizException(ErrorCode.CHAIN_REJECTED,
+            throw new BizException(ErrorCode.CHAIN_REVERTED,
                     action + "被链上拒绝：" + RevertReason.describe(receipt));
         }
         return receipt.getTransactionHash();
