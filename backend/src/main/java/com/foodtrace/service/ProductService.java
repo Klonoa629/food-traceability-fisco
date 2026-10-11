@@ -10,9 +10,9 @@ import com.foodtrace.security.LoginUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+
+
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +50,8 @@ public class ProductService {
     private final ProductCache productCache;
     /** 审计服务 */
     private final OperateLogService operateLogService;
+    /** 文件存证与业务摘要校验 */
+    private final EvidenceService evidenceService;
 
     /**
      * 注册产品（仅基地角色），成功后返回链上产品
@@ -72,7 +74,7 @@ public class ProductService {
     private ProductVO doRegister(RegisterProductRequest request, LoginUser user) {
         requireChainIdentity(user);
         requireRole(user, 1, "仅基地机构可注册产品");
-        String dataHash = orSha256(request.dataHash(),
+        String dataHash = evidenceService.normalize(request.dataHash(),
                 request.name() + "|" + request.batchNo() + "|" + request.description() + "|" + request.location());
         String txHash = chainProductService.registerProduct(user.signUserId(), request.name(),
                 request.batchNo(), request.description(), request.location(), dataHash);
@@ -104,7 +106,7 @@ public class ProductService {
     private ProductVO doAddRecord(long productId, AddRecordRequest request, LoginUser user) {
         requireChainIdentity(user);
         requireStageMatchesRole(user, request.stage());
-        String dataHash = orSha256(request.dataHash(),
+        String dataHash = evidenceService.normalize(request.dataHash(),
                 productId + "|" + request.stage() + "|" + request.description() + "|" + request.location());
         String txHash = chainProductService.addRecord(user.signUserId(), productId, request.stage(),
                 request.description(), request.location(), dataHash);
@@ -159,7 +161,7 @@ public class ProductService {
     private ProductVO doInspect(long productId, InspectRequest request, LoginUser user) {
         requireChainIdentity(user);
         requireRole(user, 3, "仅质检机构可执行质检");
-        String reportHash = orSha256(request.reportHash(), productId + "|" + request.qualified());
+        String reportHash = evidenceService.requireFile(request.reportHash());
         String txHash = chainProductService.inspectProduct(user.signUserId(), productId,
                 reportHash, request.qualified());
         audit(user, "INSPECT", productId, txHash,
@@ -189,7 +191,7 @@ public class ProductService {
         if (!operator.regulator() || operator.signUserId() == null) {
             throw new BizException(ErrorCode.FORBIDDEN, "仅监管机构可召回产品");
         }
-        String reasonHash = orSha256(request.reasonHash(), productId + "|" + request.reason());
+        String reasonHash = evidenceService.normalize(request.reasonHash(), productId + "|" + request.reason());
         String txHash = chainProductService.recallProduct(operator.signUserId(), productId, reasonHash);
         audit(operator, "RECALL", productId, txHash, "召回原因：" + request.reason());
         return refresh(productId);
@@ -301,23 +303,4 @@ public class ProductService {
         operateLogService.record(user.id(), user.username(), action, productId, txHash, detail);
     }
 
-    /**
-     * 哈希兜底：调用方提供则原样使用，否则对内容计算 SHA-256
-     */
-    private static String orSha256(String provided, String content) {
-        if (provided != null && !provided.isBlank()) {
-            return provided;
-        }
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(content.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hex = new StringBuilder(digest.length * 2);
-            for (byte b : digest) {
-                hex.append(String.format("%02x", b));
-            }
-            return hex.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 不可用", e);
-        }
-    }
 }

@@ -25,7 +25,7 @@ export const addRecord = (id: number, data: { stage: number; description: string
 export const handover = (id: number, nextHolder: string) =>
   unwrap<ProductVO>(http.post<Result<ProductVO>>(`/products/${id}/handover`, { nextHolder }))
 
-export const inspect = (id: number, data: { qualified: boolean; reportHash?: string | null }) =>
+export const inspect = (id: number, data: { qualified: boolean; reportHash: string }) =>
   unwrap<ProductVO>(http.post<Result<ProductVO>>(`/products/${id}/inspect`, data))
 
 export const listOrgs = () => unwrap<UserInfo[]>(http.get<Result<UserInfo[]>>('/orgs'))
@@ -64,7 +64,7 @@ export const adminVerifyLogs = () =>
 export const adminVerifyChain = () =>
   unwrap<AuditChainVO>(http.get<Result<AuditChainVO>>('/admin/logs/verify-chain'))
 
-// 上传存证文件:返回内容哈希,可直接作为业务操作的 dataHash
+// 上传存证文件:返回内容哈希，加 file:sha256: 前缀后作为业务文件引用
 export const uploadEvidence = (file: File) => {
   const form = new FormData()
   form.append('file', file)

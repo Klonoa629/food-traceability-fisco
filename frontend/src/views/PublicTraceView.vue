@@ -4,7 +4,8 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { publicTrace } from '../api'
-import { STAGE_COLORS, STAGE_NAMES, formatTime, shortAddr, shortHash } from '../constants/maps'
+import EvidenceBadge from '../components/EvidenceBadge.vue'
+import { STAGE_COLORS, STAGE_NAMES, formatTime, shortAddr } from '../constants/maps'
 import type { ProductVO } from '../types'
 
 const route = useRoute()
@@ -58,7 +59,7 @@ onMounted(() => {
     <main class="tp-main">
       <div class="tp-hero">
         <h2>食品溯源查询</h2>
-        <p class="muted">输入产品批次号,查看链上完整流转记录 · 数据存证于 FISCO BCOS 联盟链,不可篡改</p>
+        <p class="muted">输入产品批次号,查看链上完整流转记录 · 可核验文件与链上记录是否一致，填报内容的真实性仍由提交机构负责</p>
         <div class="tp-search">
           <el-input
             v-model="batchNo"
@@ -107,7 +108,7 @@ onMounted(() => {
                 <div class="tl-meta">
                   <span>操作方 <b class="mono">{{ shortAddr(r.operator) }}</b></span>
                   <span>地点 <b>{{ r.location || '-' }}</b></span>
-                  <span v-if="r.dataHash" class="mono muted" :title="r.dataHash">链上存证 {{ shortHash(r.dataHash) }}</span>
+                  <EvidenceBadge v-if="r.dataHash" :value="r.dataHash" />
                 </div>
               </div>
             </div>
@@ -202,6 +203,7 @@ onMounted(() => {
 }
 .tl-line { width: 2px; flex: 1; min-height: 18px; opacity: 0.45; margin: 4px 0; }
 .tl-card {
+  min-width: 0;
   flex: 1;
   border: 1px solid var(--ft-border);
   border-radius: 10px;
@@ -216,4 +218,11 @@ onMounted(() => {
 .tl-desc { margin: 8px 0 10px; font-size: 14px; }
 .tl-meta { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--ft-text-secondary); }
 .tl-meta b { color: var(--ft-text); font-weight: 600; }
+@media (max-width: 600px) {
+  .tp-main { padding: 24px 12px; }
+  .tp-timeline { padding: 16px 12px; }
+  .tl-item { gap: 8px; }
+  .tl-card { padding: 12px; }
+  .tl-head { flex-wrap: wrap; }
+}
 </style>

@@ -36,3 +36,13 @@ async function logout() {
     </main>
   </div>
 </template>
+
+<style scoped>
+@media (max-width: 600px) {
+  .app-header { height: auto; min-height: 60px; flex-wrap: wrap; gap: 8px; padding: 12px; }
+  .app-brand { flex-basis: 100%; white-space: nowrap; }
+  .nav-link { padding: 6px; white-space: nowrap; }
+  .app-header .spacer { display: none; }
+  .app-main { padding: 16px 12px 32px; }
+}
+</style>

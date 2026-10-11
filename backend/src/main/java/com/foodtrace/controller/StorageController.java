@@ -5,6 +5,8 @@ import com.foodtrace.common.ErrorCode;
 import com.foodtrace.common.Result;
 import com.foodtrace.security.RateLimitService;
 import com.foodtrace.storage.StorageService;
+import com.foodtrace.service.EvidenceService;
+import java.util.Locale;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ByteArrayResource;
@@ -38,7 +40,7 @@ public class StorageController {
     private final RateLimitService rateLimitService;
 
     /**
-     * 上传存证文件，返回内容哈希（可直接作为业务接口的 dataHash）
+     * 上传存证文件，返回内容哈希（加 file:sha256: 前缀后作为业务接口的 dataHash）
      *
      * @param file 上传的文件
      * @return 存证信息
@@ -68,10 +70,11 @@ public class StorageController {
         if (!SHA256.matcher(sha256).matches()) {
             return ResponseEntity.notFound().build();
         }
-        StorageService.EvidenceFile evidence = storageService.get(sha256);
+        StorageService.EvidenceFile evidence = storageService.get(sha256.toLowerCase(Locale.ROOT));
         if (evidence == null) {
             return ResponseEntity.notFound().build();
         }
+        EvidenceService.verify(sha256, evidence.data());
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
         headers.setContentDisposition(ContentDisposition.attachment()

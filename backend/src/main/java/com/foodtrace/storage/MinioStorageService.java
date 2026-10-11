@@ -100,8 +100,11 @@ public class MinioStorageService implements StorageService {
                     GetObjectArgs.builder().bucket(bucket).object(sha256).build())) {
                 return new EvidenceFile(filename, object.readAllBytes());
             }
-        } catch (ErrorResponseException notFound) {
-            return null;
+        } catch (ErrorResponseException e) {
+            if ("NoSuchKey".equals(e.errorResponse().code())) {
+                return null;
+            }
+            throw new IllegalStateException("存证读取失败：" + e.getMessage(), e);
         } catch (Exception e) {
             throw new IllegalStateException("存证读取失败：" + e.getMessage(), e);
         }

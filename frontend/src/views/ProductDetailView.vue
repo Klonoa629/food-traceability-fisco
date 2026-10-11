@@ -6,11 +6,12 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import QRCode from 'qrcode'
 import AppShell from '../components/AppShell.vue'
+import EvidenceBadge from '../components/EvidenceBadge.vue'
 import { addRecord, getProduct, handover, inspect, listOrgs, uploadEvidence } from '../api'
 import { useAuthStore } from '../stores/auth'
 import {
   ROLE_NAMES, ROLE_STAGE, STAGE_COLORS, STAGE_NAMES,
-  formatTime, shortAddr, shortHash
+  formatTime, shortAddr
 } from '../constants/maps'
 import type { ProductVO, UserInfo } from '../types'
 
@@ -70,14 +71,26 @@ const recordSubmitting = ref(false)
 const evidenceUploading = ref(false)
 
 // 上传存证文件，成功后以内容哈希作为 dataHash
-async function onEvidenceChange(event: Event) {
+async function onEvidenceChange(event: Event, report = false) {
   const file = (event.target as HTMLInputElement).files?.[0]
   if (!file) return
+  if (file.size > 20 * 1024 * 1024 || file.size === 0) {
+    ElMessage.warning('请选择非空且不超过 20 MB 的文件')
+    ;(event.target as HTMLInputElement).value = ''
+    return
+  }
+  if (report) { inspectForm.reportHash = ''; inspectForm.evidenceFile = '' }
+  else { recordForm.dataHash = ''; recordForm.evidenceFile = '' }
   evidenceUploading.value = true
   try {
     const info = await uploadEvidence(file)
-    recordForm.dataHash = info.sha256
-    recordForm.evidenceFile = info.filename
+    if (report) {
+      inspectForm.reportHash = 'file:sha256:' + info.sha256
+      inspectForm.evidenceFile = info.filename
+    } else {
+      recordForm.dataHash = 'file:sha256:' + info.sha256
+      recordForm.evidenceFile = info.filename
+    }
     ElMessage.success(`存证已上传：${info.filename}`)
   } finally {
     evidenceUploading.value = false
@@ -86,6 +99,7 @@ async function onEvidenceChange(event: Event) {
 }
 
 async function submitRecord() {
+  if (evidenceUploading.value) return
   await recordFormRef.value?.validate()
   recordSubmitting.value = true
   try {
@@ -135,10 +149,15 @@ async function submitHandover() {
 
 // 质检裁决
 const inspectDialog = ref(false)
-const inspectForm = reactive({ qualified: true, reportHash: '' })
+const inspectForm = reactive({ qualified: true, reportHash: '', evidenceFile: '' })
 const inspectSubmitting = ref(false)
 
 async function submitInspect() {
+  if (evidenceUploading.value) return
+  if (!inspectForm.reportHash) {
+    ElMessage.warning('请先上传检测报告文件')
+    return
+  }
   if (!inspectForm.qualified) {
     await ElMessageBox.confirm(
       '判定不合格将直接把产品置为召回态,不可逆。确认?',
@@ -150,11 +169,12 @@ async function submitInspect() {
   try {
     product.value = await inspect(id, {
       qualified: inspectForm.qualified,
-      reportHash: inspectForm.reportHash.trim() || null
+      reportHash: inspectForm.reportHash.trim()
     })
     ElMessage.success(inspectForm.qualified ? '质检合格,已上链' : '质检不合格,产品已召回')
     inspectDialog.value = false
     inspectForm.reportHash = ''
+    inspectForm.evidenceFile = ''
   } finally {
     inspectSubmitting.value = false
   }
@@ -209,9 +229,7 @@ async function submitInspect() {
                 <div class="tl-meta">
                   <span>操作方 <b>{{ orgNameOf(r.operator) }}</b></span>
                   <span>地点 <b>{{ r.location || '-' }}</b></span>
-                  <span v-if="r.dataHash">
-                    <a class="mono evidence-link" :href="`/api/storage/${r.dataHash}`" target="_blank" :title="r.dataHash">存证 {{ shortHash(r.dataHash) }}</a>
-                  </span>
+                  <EvidenceBadge v-if="r.dataHash" :value="r.dataHash" />
                 </div>
               </div>
             </div>
@@ -239,7 +257,7 @@ async function submitInspect() {
         </aside>
       </div>
 
-      <el-dialog v-model="recordDialog" :title="`记录${STAGE_NAMES[myStage ?? 0]}环节(上链)`" width="480px" :close-on-click-modal="false">
+      <el-dialog v-model="recordDialog" :title="`记录${STAGE_NAMES[myStage ?? 0]}环节(上链)`" width="min(480px, 94vw)" :close-on-click-modal="false">
         <el-form ref="recordFormRef" :model="recordForm" :rules="recordRules" label-position="top">
           <el-form-item label="记录内容" prop="description">
             <el-input v-model="recordForm.description" type="textarea" :rows="3" placeholder="如:首批采摘完成,冷链待发" />
@@ -247,25 +265,25 @@ async function submitInspect() {
           <el-form-item label="地点" prop="location">
             <el-input v-model="recordForm.location" placeholder="如:云南昆明" />
           </el-form-item>
-          <el-form-item label="数据哈希(选填)">
+          <el-form-item label="附件存证（选填）">
             <div class="evidence-row">
-              <el-input v-model="recordForm.dataHash" placeholder="留空则由后端自动计算 SHA-256 存证" />
+              <el-input :model-value="recordForm.evidenceFile" readonly placeholder="未上传附件时，仅保存业务摘要" />
               <label class="evidence-upload" :class="{ uploading: evidenceUploading }">
                 {{ evidenceUploading ? '上传中…' : (recordForm.evidenceFile || '上传附件') }}
-                <input type="file" hidden @change="onEvidenceChange" :disabled="evidenceUploading" />
+                <input type="file" hidden @change="onEvidenceChange($event)" :disabled="evidenceUploading || recordSubmitting || inspectSubmitting" />
               </label>
             </div>
           </el-form-item>
         </el-form>
         <template #footer>
           <el-button @click="recordDialog = false" :disabled="recordSubmitting">取消</el-button>
-          <el-button type="primary" :loading="recordSubmitting" @click="submitRecord">
+          <el-button type="primary" :loading="recordSubmitting" :disabled="evidenceUploading" @click="submitRecord">
             {{ recordSubmitting ? '上链中…' : '确认上链' }}
           </el-button>
         </template>
       </el-dialog>
 
-      <el-dialog v-model="handoverDialog" title="交接给下游机构(上链)" width="480px" :close-on-click-modal="false">
+      <el-dialog v-model="handoverDialog" title="交接给下游机构(上链)" width="min(480px, 94vw)" :close-on-click-modal="false">
         <el-select v-model="nextHolder" placeholder="选择下游机构" style="width: 100%" size="large">
           <el-option v-for="o in handoverTargets" :key="o.chainAddress" :value="o.chainAddress"
             :label="`${o.orgName}(${ROLE_NAMES[o.role] ?? ''})`">
@@ -283,7 +301,7 @@ async function submitInspect() {
         </template>
       </el-dialog>
 
-      <el-dialog v-model="inspectDialog" title="质检裁决(上链)" width="480px" :close-on-click-modal="false">
+      <el-dialog v-model="inspectDialog" title="质检裁决(上链)" width="min(480px, 94vw)" :close-on-click-modal="false">
         <el-form label-position="top">
           <el-form-item label="质检结论">
             <el-radio-group v-model="inspectForm.qualified">
@@ -291,13 +309,16 @@ async function submitInspect() {
               <el-radio :value="false">不合格(将直接召回)</el-radio>
             </el-radio-group>
           </el-form-item>
-          <el-form-item label="检测报告哈希(选填)">
-            <el-input v-model="inspectForm.reportHash" placeholder="留空则由后端自动计算 SHA-256 存证" />
+          <el-form-item label="检测报告（必传，最大 20 MB）">
+            <label class="evidence-upload">
+              {{ evidenceUploading ? '上传中…' : (inspectForm.evidenceFile || '选择报告文件') }}
+              <input type="file" hidden aria-label="检测报告" @change="onEvidenceChange($event, true)" :disabled="evidenceUploading || inspectSubmitting" />
+            </label>
           </el-form-item>
         </el-form>
         <template #footer>
           <el-button @click="inspectDialog = false" :disabled="inspectSubmitting">取消</el-button>
-          <el-button :type="inspectForm.qualified ? 'primary' : 'danger'" :loading="inspectSubmitting" @click="submitInspect">
+          <el-button :type="inspectForm.qualified ? 'primary' : 'danger'" :loading="inspectSubmitting" :disabled="evidenceUploading || !inspectForm.reportHash" @click="submitInspect">
             {{ inspectSubmitting ? '上链中…' : '提交裁决' }}
           </el-button>
         </template>
@@ -364,6 +385,7 @@ async function submitInspect() {
 }
 .tl-line { width: 2px; flex: 1; min-height: 18px; opacity: 0.45; margin: 4px 0; }
 .tl-card {
+  min-width: 0;
   flex: 1;
   border: 1px solid var(--ft-border);
   border-radius: 10px;
@@ -380,15 +402,22 @@ async function submitInspect() {
 .tl-meta b { color: var(--ft-text); font-weight: 600; }
 .evidence-link { color: var(--el-color-primary); text-decoration: none; font-size: 13px; }
 .evidence-link:hover { text-decoration: underline; }
-.evidence-row { display: flex; gap: 10px; width: 100%; }
+.evidence-row { display: flex; flex-wrap: wrap; gap: 10px; width: 100%; }
 .evidence-upload {
   flex-shrink: 0; display: inline-flex; align-items: center; padding: 0 12px;
   border: 1px dashed var(--el-border-color); border-radius: 4px;
-  font-size: 13px; cursor: pointer; white-space: nowrap; color: var(--ft-text-secondary);
+  font-size: 13px; cursor: pointer; max-width: 100%; overflow-wrap: anywhere; color: var(--ft-text-secondary);
 }
 .evidence-upload:hover, .evidence-upload.uploading { border-color: var(--el-color-primary); color: var(--el-color-primary); }
 
 .action-panel { padding: 20px 22px; position: sticky; top: 80px; }
 .action-hint { font-size: 14px; margin: 0 0 14px; }
 .action-btn { width: 100%; margin: 0 0 10px !important; }
+@media (max-width: 600px) {
+  .detail-head { flex-direction: column; padding: 18px; }
+  .dh-right { min-width: 0; }
+  .timeline-wrap { padding: 16px; }
+  .tl-head { flex-wrap: wrap; }
+  .evidence-upload input { max-width: 100%; }
+}
 </style>

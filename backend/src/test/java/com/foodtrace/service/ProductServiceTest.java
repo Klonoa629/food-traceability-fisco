@@ -53,7 +53,7 @@ class ProductServiceTest {
     @BeforeEach
     void setUp() {
         productService = new ProductService(chainProductService, chainReader,
-                productCache, operateLogService);
+                productCache, operateLogService, new EvidenceService(mock(com.foodtrace.storage.StorageService.class)));
     }
 
     /**
