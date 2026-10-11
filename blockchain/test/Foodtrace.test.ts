@@ -61,18 +61,12 @@ async function runFullChain(ctx: Ctx) {
 
 // 断言交易被回滚且错误消息包含指定文本
 async function expectRevert(promise: Promise<unknown>, message: string) {
-  try {
-    await promise;
-    assert.fail(`should revert with "${message}"`);
-  } catch (error) {
-    const err = error as Error;
-    assert.ok(
-      err.message.includes(message),
-      `expected revert to contain "${message}", actual: ${err.message}`,
-    );
-  }
+  await assert.rejects(promise, (error: Error) => {
+    assert.ok(error.message.includes(message),
+      `expected revert to contain "${message}", actual: ${error.message}`);
+    return true;
+  });
 }
-
 // 断言交易恰好触发指定名称的事件并返回解析结果
 async function expectEvent(ctx: Ctx, tx: Promise<ContractTransactionResponse>, eventName: string) {
   const receipt = await (await tx).wait();

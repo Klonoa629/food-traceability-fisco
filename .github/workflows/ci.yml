@@ -67,3 +67,19 @@ jobs:
       - run: npm test
       - run: npm run lint
       - run: npm run build
+      # 浏览器依赖隔离在 runner 临时目录，不进入应用运行依赖。
+      - name: 准备浏览器回归环境
+        run: |
+          npm install --prefix "$RUNNER_TEMP/browser-qa" --no-save --no-package-lock --ignore-scripts playwright-core@1.64.0
+          node "$RUNNER_TEMP/browser-qa/node_modules/playwright-core/cli.js" install --with-deps chromium
+      - name: 文件核验与质检页面回归
+        run: npm run test:browser
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/browser-qa/node_modules/playwright-core
+          E2E_ARTIFACT_DIR: ${{ runner.temp }}/foodtrace-e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-regression
+          path: ${{ runner.temp }}/foodtrace-e2e
+          if-no-files-found: ignore

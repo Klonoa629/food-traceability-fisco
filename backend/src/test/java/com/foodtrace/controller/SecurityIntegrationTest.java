@@ -227,12 +227,40 @@ class SecurityIntegrationTest {
         when(storageService.get(org.mockito.ArgumentMatchers.anyString()))
                 .thenReturn(new StorageService.EvidenceFile("质检报告.pdf", new byte[]{1, 2}));
         // 下载匿名可达
-        mockMvc.perform(get("/api/storage/" + "a".repeat(64)))
-                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/storage/" + com.foodtrace.service.EvidenceService.sha256(new byte[]{1, 2})).with(request -> { request.setRemoteAddr("192.0.2.11"); return request; }))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_OCTET_STREAM))
+                .andExpect(content().bytes(new byte[]{1, 2}));
         // 上传未登录拒绝
         mockMvc.perform(multipart("/api/storage/upload").file(
                         new org.springframework.mock.web.MockMultipartFile(
                                 "file", "a.pdf", "application/pdf", new byte[]{1})))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void replacedEvidenceMustNotBeReturnedAsOriginalFile() throws Exception {
+        when(storageService.get(anyString()))
+                .thenReturn(new StorageService.EvidenceFile("report.pdf", new byte[]{1, 2}));
+        mockMvc.perform(get("/api/storage/" + "b".repeat(64))
+                        .with(request -> { request.setRemoteAddr("192.0.2.12"); return request; }))
+                .andExpect(jsonPath("$.code").value(409))
+                .andExpect(jsonPath("$.message").value("存证文件内容与哈希不符，请联系管理员核查"));
+    }
+
+    @Test
+    void missingEvidenceShouldReturn404() throws Exception {
+        mockMvc.perform(get("/api/storage/" + "c".repeat(64))
+                        .with(request -> { request.setRemoteAddr("192.0.2.13"); return request; }))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void inspectionWithoutUploadedReportShouldFailBeforeBusinessService() throws Exception {
+        String token = tokenOf(account(3L, "inspector", false, 3, 1));
+        mockMvc.perform(post("/api/products/1/inspect").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"qualified\":true}"))
+                .andExpect(jsonPath("$.code").value(400));
+        verify(productService, never()).inspect(anyLong(), any(), any());
     }
 }

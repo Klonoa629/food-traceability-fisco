@@ -98,9 +98,9 @@ Foodtrace 合约部署在 `0x2af6160e266f763652f433a80b94fc13f4065303`，
 ## 测试
 
 ```bash
-cd blockchain && npm test     # 合约 47 个用例
-cd backend && ./gradlew test  # 后端 19 个用例（-Pintegration 需链环境）
-cd frontend && npm run build  # 类型检查 + 构建
+cd blockchain && npm run compile && npm test  # 合约与锚定回归
+cd backend && ./gradlew test  # 后端回归（-Pintegration 需链环境）
+cd frontend && npm test && npm run lint && npm run build
 ```
 
 ## 写链幂等与故障恢复
@@ -140,3 +140,10 @@ cd frontend && npm run build  # 类型检查 + 构建
 
 哈希核验只能说明当前文件与链上记录一致，无法证明原始检测或填报内容真实；
 真实性仍需提交机构、检测流程与线下责任制度保证。此格式升级不需要重部署合约。
+
+浏览器回归由 CI 自动运行：构建页面后，使用固定 API 夹具检查桌面/手机展示、
+文件核验成功/缺失/内容不符，以及质检上传到提交的流程，失败时保留截图。
+这属于前端集成测试，不代表真实 FISCO、MySQL、MinIO 联调已经通过。
+本机有 Playwright Core 时可运行 `npm run test:browser`；依赖在其他目录时设置
+`PLAYWRIGHT_MODULE` 为模块绝对路径，使用已有浏览器可设置 `E2E_BROWSER_PATH`。
+该脚本启动并关闭独立的 5174 端口预览服务，截图默认保存在系统临时目录。
