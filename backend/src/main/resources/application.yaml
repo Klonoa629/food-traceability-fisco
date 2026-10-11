@@ -52,9 +52,9 @@ spring:
     username: root
     password: "${FOODTRACE_DB_PASSWORD}"
   flyway:
-    # 已有库按当前版本基线接入，新库从 V1 全量执行
-    baseline-on-migrate: true
-    baseline-version: 3
+    # 默认只接受空库或已有 Flyway 历史的库；旧库须先核对实际结构再显式接管
+    baseline-on-migrate: ${FOODTRACE_DB_BASELINE:false}
+    baseline-version: ${FOODTRACE_DB_BASELINE_VERSION:1}
 
 management:
   endpoints:

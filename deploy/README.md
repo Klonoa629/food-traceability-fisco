@@ -133,3 +133,35 @@ Compose 固定 Nginx 的内部地址为 `172.30.0.10`，后端仅信任该地址
 
 若默认容器网段冲突，在 `.env` 中同时调整 `FOODTRACE_SUBNET` 和
 `FOODTRACE_WEB_IP`，后者必须属于前者。不要把任意来源配置成可信代理。
+
+## 上传、存储与合约配置
+
+单文件上限为 20MB，Nginx 与后端均允许 25MB 的完整 multipart 请求。
+Compose 自动把 MinIO 的账号口令传给后端；使用外部对象存储时，可以通过
+`FOODTRACE_STORAGE_ENDPOINT`、`FOODTRACE_STORAGE_ACCESS_KEY`、
+`FOODTRACE_STORAGE_SECRET_KEY` 单独覆盖。
+
+`FOODTRACE_CONTRACT_ADDRESS` 和 `FOODTRACE_ANCHOR_ADDRESS` 均会传入后端容器。
+后者应填写由平台监管签名账户部署的 AuditAnchor 合约地址。空地址表示尚未启用，
+不能将本地哈希链校验解释为已经完成链上锚定。
+
+## Flyway 接管旧库
+
+空库启动时执行全部版本迁移；已有 `flyway_schema_history` 的库按历史继续升级。
+对于非空且没有 Flyway 历史的旧库，默认拒绝自动接管，以免跳过缺失字段。
+
+先备份并执行以下只读检查，对照 `backend/src/main/resources/db/migration/`：
+
+```sql
+SHOW CREATE TABLE sys_user;
+SHOW CREATE TABLE operate_log;
+SHOW TABLES LIKE 'flyway_schema_history';
+```
+
+- 只有 V1 的表结构：首次启动设置 `FOODTRACE_DB_BASELINE=true`、
+  `FOODTRACE_DB_BASELINE_VERSION=1`，让 V2 及后续迁移正常执行。
+- 已完整包含 V2、V3 的字段：逐项确认后，首次接管可将基线设为 3。
+- 不完整或与迁移脚本不符的结构：先制定修复方案，不猜测基线版本。
+
+首次接管成功后，把 `FOODTRACE_DB_BASELINE` 改回 `false`。
+不要更改已经执行的历史迁移脚本，也不要对新库手动创建业务表。
