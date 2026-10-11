@@ -16,7 +16,7 @@ export const listProducts = (params?: { page?: number; size?: number; keyword?: 
 export const getProduct = (id: number | string) =>
   unwrap<ProductVO>(http.get<Result<ProductVO>>(`/products/${id}`))
 
-export const createProduct = (data: { name: string; batchNo: string; description?: string; location: string; dataHash?: string | null }) =>
+export const createProduct = (data: { name: string; batchNo: string; description: string; location: string; dataHash?: string | null }) =>
   unwrap<ProductVO>(http.post<Result<ProductVO>>('/products', data))
 
 export const addRecord = (id: number, data: { stage: number; description: string; location: string; dataHash?: string | null }) =>

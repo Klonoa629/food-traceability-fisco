@@ -30,7 +30,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright-core')
  const bytes=Buffer.from('食品检测报告：合格');
  const hash=require('node:crypto').createHash('sha256').update(bytes).digest('hex');
  const product={id:1,name:'阳光草莓',batchNo:'QA-001',originFarm:'0xfarm',currentHolder:'0xinsp',stage:2,recalled:false,records:[{stage:0,operator:'0xfarm',location:'云南昆明',description:'首批采摘',timestamp:1791691200000,dataHash:'sha256:'+hash},{stage:2,operator:'0xinsp',location:'合肥检测中心',description:'农残检测合格',timestamp:1791694800000,dataHash:'file:sha256:'+hash},{stage:1,operator:'0xprocessing',location:'昆明',description:'旧版记录',timestamp:1791692400000,dataHash:hash}]};
- let mode='ok',submitted=null, listQuery=null;
+ let mode='ok',submitted=null, listQuery=null, created=null;
  await page.route('**/api/**',async route=>{
  const url=new URL(route.request().url());
  // Vite 源码模块 /src/api/ 不属于后端请求。
@@ -39,6 +39,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright-core')
  if(url.pathname==='/api/storage/upload')data={sha256:hash,filename:'报告.txt',size:bytes.length};
  else if(url.pathname.startsWith('/api/storage/'))return route.fulfill({status:mode==='missing'?404:200,contentType:'application/octet-stream',body:mode==='tampered'?Buffer.from('tampered'):bytes});
  else if(url.pathname==='/api/orgs') data=[];
+ else if(url.pathname==='/api/products' && route.request().method()==='POST') { created=route.request().postDataJSON(); data=product; }
  else if(url.pathname==='/api/products') {
    listQuery=Object.fromEntries(url.searchParams);
    const current=Number(listQuery.page || 1);
@@ -107,6 +108,21 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright-core')
  assert.equal(listQuery.stage,undefined);
  assert.deepEqual(errors,[]);
  console.log('cross-page search and filter reset: pass');
+ await page.evaluate(()=>{const user=JSON.parse(localStorage.getItem('ft_user'));user.role=1;localStorage.setItem('ft_user',JSON.stringify(user));});
+ await page.reload();
+ await page.getByRole('button',{name:'+ 注册产品'}).click();
+ await page.getByPlaceholder('如:阳光草莓').fill('测试草莓');
+ await page.getByPlaceholder('如:B20260922-A1').fill('QA-CREATE');
+ await page.getByPlaceholder('如:云南昆明').fill('昆明');
+ await page.getByRole('button',{name:'确认注册',exact:true}).click();
+ await page.getByText('请输入产品描述',{exact:true}).waitFor();
+ assert.equal(created,null);
+ await page.getByPlaceholder('描述种植或生产情况').fill('  首批采摘  ');
+ await page.getByRole('button',{name:'确认注册',exact:true}).click();
+ await page.getByText('产品「阳光草莓」已注册上链',{exact:true}).waitFor();
+ assert.equal(created.description,'首批采摘');
+ assert.deepEqual(errors,[]);
+ console.log('required product description: pass');
  } catch (error) {
    if (page) await page.screenshot({path:out+'failure.png',fullPage:true}).catch(() => {});
    throw error;

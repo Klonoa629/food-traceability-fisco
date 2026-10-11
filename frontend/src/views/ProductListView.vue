@@ -95,18 +95,19 @@ const form = reactive({ name: '', batchNo: '', description: '', location: '', da
 const rules: FormRules = {
   name: [{ required: true, message: '请输入产品名称', trigger: 'blur' }],
   batchNo: [{ required: true, message: '请输入批次号(全局唯一)', trigger: 'blur' }],
-  location: [{ required: true, message: '请输入产地', trigger: 'blur' }]
+  location: [{ required: true, message: '请输入产地', trigger: 'blur' }],
+  description: [{ required: true, whitespace: true, message: '请输入产品描述', trigger: 'blur' }]
 }
 const submitting = ref(false)
 
 async function submitCreate() {
-  await formRef.value?.validate()
+  if (!await formRef.value?.validate().catch(() => false)) return
   submitting.value = true // 上链写操作 1-3 秒,防重复提交
   try {
     const p = await createProduct({
       name: form.name.trim(),
       batchNo: form.batchNo.trim(),
-      description: form.description || undefined,
+      description: form.description.trim(),
       location: form.location.trim(),
       dataHash: form.dataHash.trim() || null
     })
@@ -224,7 +225,7 @@ function openDetail(p: ProductVO) {
           <el-input v-model="form.location" placeholder="如:云南昆明" />
         </el-form-item>
         <el-form-item label="产品描述" prop="description">
-          <el-input v-model="form.description" type="textarea" :rows="2" placeholder="选填" />
+          <el-input v-model="form.description" type="textarea" :rows="2" placeholder="描述种植或生产情况" />
         </el-form-item>
         <el-form-item label="数据哈希(选填)">
           <el-input v-model="form.dataHash" placeholder="留空则由后端自动计算 SHA-256 存证" />
