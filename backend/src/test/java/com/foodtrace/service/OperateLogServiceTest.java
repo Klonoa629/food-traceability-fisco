@@ -22,7 +22,9 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 审计链上校验单元测试：事件签名、首个索引参数与回执状态的核对
@@ -142,4 +144,47 @@ class OperateLogServiceTest {
 
         assertThat(service.verifyOnChain()).containsEntry(14L, true);
     }
-}
+
+    @Test
+    void eventAuditShouldInsertCompleteHashInOneStatement() {
+        when(auditChainService.hash(eq(AuditChainService.GENESIS), any())).thenReturn("hash");
+        service.recordChainEvent(1L, "0xevent", "回放");
+        var row = org.mockito.ArgumentCaptor.forClass(OperateLog.class);
+        verify(operateLogMapper).insert(row.capture());
+        assertThat(row.getValue().getPrevHash()).isEqualTo(AuditChainService.GENESIS);
+        assertThat(row.getValue().getRowHash()).isEqualTo("hash");
+        verify(operateLogMapper, never()).updateById(any(OperateLog.class));
+    }
+
+    @Test
+    void eventAuditFailureShouldPropagateForReplay() {
+        when(operateLogMapper.selectCount(any())).thenThrow(new IllegalStateException("数据库不可用"));
+        assertThatThrownBy(() -> service.recordChainEvent(1L, "0xevent", "回放"))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void replayedEventShouldNotInsertDuplicateAudit() {
+        when(operateLogMapper.selectCount(any())).thenReturn(1L);
+        service.recordChainEvent(1L, "0xevent", "回放");
+        verify(operateLogMapper, never()).insert(any(OperateLog.class));
+    }
+    @Test
+    void recoveredEventShouldVerifyAgainstReceipt() {
+        OperateLog recovered = entry(20, "CHAIN_EVENT", 3L, "0xreplay");
+        recovered.setDetail("链上事件补录：ProductRecalled（来源待核对）");
+        when(operateLogMapper.selectList(any())).thenReturn(List.of(recovered));
+        stubReceipt("0xreplay", 0, CONTRACT, topic("ProductRecalled(uint256,address)"),
+                String.format("0x%064x", 3L));
+        assertThat(service.verifyOnChain()).containsEntry(20L, true);
+    }
+
+    @Test
+    void recoveredEventWithWrongTargetShouldFail() {
+        OperateLog recovered = entry(20, "CHAIN_EVENT", 4L, "0xreplay");
+        recovered.setDetail("链上事件补录：ProductRecalled（来源待核对）");
+        when(operateLogMapper.selectList(any())).thenReturn(List.of(recovered));
+        stubReceipt("0xreplay", 0, CONTRACT, topic("ProductRecalled(uint256,address)"),
+                String.format("0x%064x", 3L));
+        assertThat(service.verifyOnChain()).containsEntry(20L, false);
+    }}

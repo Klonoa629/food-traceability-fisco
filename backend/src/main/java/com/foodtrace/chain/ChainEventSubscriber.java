@@ -1,9 +1,11 @@
 package com.foodtrace.chain;
 
 import com.foodtrace.config.ContractProperties;
+import com.foodtrace.mapper.ChainEventCursorMapper;
 import com.foodtrace.service.OperateLogService;
 import io.micrometer.core.instrument.MeterRegistry;
-import jakarta.annotation.PostConstruct;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,8 +34,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * 合约事件订阅
  *
  * <p>后台订阅 Foodtrace 合约事件：外部（未经后端）的链上操作即时失效
- * 产品缓存并落 CHAIN_EVENT 审计；自有交易只做缓存失效兜底，审计仍由
- * 业务路径携带完整上下文记录。
+ * 产品缓存并落 CHAIN_EVENT 审计；缺失的自有交易审计同样补录。
+ * 成功处理后才推进持久化进度，重连时包含最后一个区块以免漏掉同块事件。
  *
  * @author Microft0629
  * @since 2026-10-10
@@ -73,6 +76,8 @@ public class ChainEventSubscriber {
     private final OperateLogService operateLogService;
     /** 上链写入统一入口（区分内外部交易） */
     private final ChainWriter chainWriter;
+    /** 持久化回放进度 */
+    private final ChainEventCursorMapper cursorMapper;
     /** 指标注册表 */
     private final MeterRegistry meterRegistry;
     /** 重订阅调度 */
@@ -86,19 +91,31 @@ public class ChainEventSubscriber {
     private final AtomicBoolean retryScheduled = new AtomicBoolean(false);
     /** 订阅标识 */
     private volatile String subscribeId;
+    /** 等待重订阅时暂停消费，防止越过失败事件 */
+    private volatile boolean replayRequired;
+    private volatile boolean stopped;
+    /** 已退休订阅的迟到回调不得推进新订阅进度 */
+    private volatile long generation;
 
     /**
-     * 启动时建立订阅（仅订阅新产生的事件，历史由链上校验覆盖）
+     * 应用初始化完成后从持久化进度回放；首次从创世块开始补齐
      */
-    @PostConstruct
+    @EventListener(ApplicationReadyEvent.class)
     void start() {
+        if (stopped) {
+            return;
+        }
         try {
+            long currentGeneration = ++generation;
+            unsubscribe();
+            Long block = cursorMapper.findBlock(streamKey());
             EventSubParams params = new EventSubParams();
-            params.setFromBlock(BigInteger.valueOf(-1));
+            params.setFromBlock(BigInteger.valueOf(block == null ? 0 : block));
             params.setToBlock(BigInteger.valueOf(-1));
             params.addAddress(contractProperties.getContractAddress());
-            subscribeId = EventSubscribe.build(client).subscribeEvent(params, this::onReceiveLog);
-            retryScheduled.set(false);
+            replayRequired = false;
+            subscribeId = EventSubscribe.build(client).subscribeEvent(params,
+                    (id, status, logs) -> receive(currentGeneration, id, status, logs));
             log.info("合约事件订阅已建立 id={} 合约={}", subscribeId,
                     contractProperties.getContractAddress());
         } catch (Exception e) {
@@ -112,9 +129,15 @@ public class ChainEventSubscriber {
      */
     @PreDestroy
     void stop() {
+        stopped = true;
         retry.shutdownNow();
+        unsubscribe();
+    }
+
+    private void unsubscribe() {
         String id = subscribeId;
         if (id != null) {
+            subscribeId = null;
             try {
                 EventSubscribe.build(client).unsubscribeEvent(id);
             } catch (Exception ignored) {
@@ -130,18 +153,34 @@ public class ChainEventSubscriber {
      * @param status   推送状态，0 为正常
      * @param logs     本次推送的事件日志
      */
-    void onReceiveLog(String recordId, int status, List<EventLog> logs) {
+    private synchronized void receive(long receivedGeneration, String id, int status, List<EventLog> logs) {
+        if (receivedGeneration == generation) {
+            onReceiveLog(id, status, logs);
+        }
+    }
+
+    synchronized void onReceiveLog(String recordId, int status, List<EventLog> logs) {
+        if (stopped || replayRequired) {
+            return;
+        }
         if (status != 0) {
             log.warn("合约事件订阅状态异常 status={}，30 秒后重订阅", status);
             meterRegistry.counter("chain.event.error").increment();
             scheduleRetry();
             return;
         }
-        for (EventLog eventLog : logs) {
+        if (logs == null || logs.isEmpty()) {
+            return;
+        }
+        for (EventLog eventLog : logs.stream()
+                .sorted(Comparator.comparing(EventLog::getBlockNumber)).toList()) {
             try {
                 handleLog(eventLog);
+                cursorMapper.advance(streamKey(), eventLog.getBlockNumber().longValueExact());
             } catch (Exception e) {
                 log.warn("事件处理失败 tx={}：{}", eventLog.getTransactionHash(), e.getMessage());
+                scheduleRetry();
+                return;
             }
         }
     }
@@ -161,18 +200,16 @@ public class ChainEventSubscriber {
         if (productId != null) {
             productCache.evict(productId);
         }
-        if (chainWriter.isOwn(eventLog.getTransactionHash())) {
-            // 自有交易已由业务路径携带完整上下文审计
-            return;
-        }
         if (operateLogService.existsByTxHash(eventLog.getTransactionHash())) {
             // 历史交易已有审计（含重启前的自有交易），节点重放不重复记录
             return;
         }
-        meterRegistry.counter("chain.event.external", "event", event).increment();
-        log.warn("检测到外部链上交易：{} tx={}", event, eventLog.getTransactionHash());
-        operateLogService.record(0L, "system", "CHAIN_EVENT", productId,
-                eventLog.getTransactionHash(), "外部链上交易：" + event + "（未经后端的合约操作）");
+        boolean own = chainWriter.isOwn(eventLog.getTransactionHash());
+        if (!own) {
+            meterRegistry.counter("chain.event.external", "event", event).increment();
+        }
+        operateLogService.recordChainEvent(productId, eventLog.getTransactionHash(),
+                "链上事件补录：" + event + (own ? "（本服务交易）" : "（来源待核对）"));
     }
 
     /**
@@ -194,8 +231,19 @@ public class ChainEventSubscriber {
      * 安排一次重订阅（并发去重）
      */
     private void scheduleRetry() {
-        if (retryScheduled.compareAndSet(false, true)) {
-            retry.schedule(this::start, 30, TimeUnit.SECONDS);
+        replayRequired = true;
+        if (!stopped && retryScheduled.compareAndSet(false, true)) {
+            retry.schedule(this::retrySubscription, 30, TimeUnit.SECONDS);
         }
+    }
+
+    /** 每次重试开始前释放标记，连续失败仍可再次调度 */
+    void retrySubscription() {
+        retryScheduled.set(false);
+        start();
+    }
+
+    private String streamKey() {
+        return client.getGroup() + ":" + contractProperties.getContractAddress().toLowerCase();
     }
 }

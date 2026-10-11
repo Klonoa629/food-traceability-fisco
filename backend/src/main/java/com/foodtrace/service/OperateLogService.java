@@ -83,30 +83,43 @@ public class OperateLogService {
     public synchronized void record(Long userId, String username, String action,
                                     Long targetId, String chainTxHash, String detail) {
         try {
-            OperateLog logEntry = new OperateLog();
-            logEntry.setUserId(userId);
-            logEntry.setUsername(username);
-            logEntry.setAction(action);
-            logEntry.setTargetId(targetId);
-            logEntry.setChainTxHash(chainTxHash);
-            logEntry.setDetail(detail);
-            // 显式秒级时间戳：与 DATETIME 精度一致，保证哈希落库往返可复现
-            logEntry.setCreatedAt(LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS));
-            // 链头为已接链的最大 id 行
-            OperateLog head = operateLogMapper.selectOne(new LambdaQueryWrapper<OperateLog>()
-                    .isNotNull(OperateLog::getRowHash)
-                    .orderByDesc(OperateLog::getId)
-                    .last("LIMIT 1"));
-            String prev = head == null ? AuditChainService.GENESIS : head.getRowHash();
-            logEntry.setPrevHash(prev);
-            operateLogMapper.insert(logEntry);
-            logEntry.setRowHash(auditChainService.hash(prev, logEntry));
-            operateLogMapper.updateById(logEntry);
+            append(userId, username, action, targetId, chainTxHash, detail);
         } catch (Exception e) {
             log.error("审计写入失败 action={} userId={}", action, userId, e);
         }
     }
 
+    /**
+     * 事件补录：同实例内与业务审计串行去重，写入失败向订阅器传播以便回放
+     */
+    public synchronized void recordChainEvent(Long productId, String txHash, String detail) {
+        if (!existsByTxHash(txHash)) {
+            append(0L, "system", "CHAIN_EVENT", productId, txHash, detail);
+        }
+    }
+
+    /**
+     * 哈希不包含自增 id，插入前即可计算；单条 INSERT 避免出现半接链的记录
+     */
+    private void append(Long userId, String username, String action,
+                        Long targetId, String chainTxHash, String detail) {
+        OperateLog entry = new OperateLog();
+        entry.setUserId(userId);
+        entry.setUsername(username);
+        entry.setAction(action);
+        entry.setTargetId(targetId);
+        entry.setChainTxHash(chainTxHash);
+        entry.setDetail(detail);
+        entry.setCreatedAt(LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS));
+        OperateLog head = operateLogMapper.selectOne(new LambdaQueryWrapper<OperateLog>()
+                .isNotNull(OperateLog::getRowHash)
+                .orderByDesc(OperateLog::getId)
+                .last("LIMIT 1"));
+        String prev = head == null ? AuditChainService.GENESIS : head.getRowHash();
+        entry.setPrevHash(prev);
+        entry.setRowHash(auditChainService.hash(prev, entry));
+        operateLogMapper.insert(entry);
+    }
     /**
      * 条件分页查询审计记录
      *
@@ -158,6 +171,9 @@ public class OperateLogService {
      * @return 吻合返回 true，无法确认或不一致返回 false
      */
     private boolean verifyEntry(OperateLog entry) {
+        if ("CHAIN_EVENT".equals(entry.getAction())) {
+            return verifyRecoveredEvent(entry);
+        }
         String eventSignature = EVENT_OF_ACTION.get(entry.getAction());
         String expectedTopic1 = expectedIndexedValue(entry, eventSignature);
         if (eventSignature == null || expectedTopic1 == null) {
@@ -187,6 +203,49 @@ public class OperateLogService {
         }
     }
 
+    /**
+     * 回放审计核验：事件类型与对象都必须匹配，不能把有效回放误报为篡改
+     */
+    private boolean verifyRecoveredEvent(OperateLog entry) {
+        if (entry.getDetail() == null) {
+            return false;
+        }
+        try {
+            TransactionReceipt receipt = client.getTransactionReceipt(
+                    entry.getChainTxHash(), false).getTransactionReceipt();
+            if (receipt == null || receipt.getStatus() != 0) {
+                return false;
+            }
+            List<String> signatures = new ArrayList<>(EVENT_OF_ACTION.values());
+            signatures.add("RegulatorChanged(address,address)");
+            for (String signature : signatures) {
+                String eventName = signature.substring(0, signature.indexOf('('));
+                if (!entry.getDetail().contains("：" + eventName + "（")) {
+                    continue;
+                }
+                String topic0 = Hex.toHexStringWithPrefix(cryptoSuite.hash(
+                        signature.getBytes(StandardCharsets.UTF_8)));
+                boolean productEvent = signature.startsWith("Product") || signature.startsWith("RecordAdded");
+                for (TransactionReceipt.Logs event : receipt.getLogEntries()) {
+                    List<String> topics = event.getTopics();
+                    if (!sameHex(contractProperties.getContractAddress(), event.getAddress())
+                            || topics.size() < 2 || !sameHex(topic0, topics.get(0))) {
+                        continue;
+                    }
+                    if (productEvent && entry.getTargetId() != null
+                            && sameHex(String.format("%064x", entry.getTargetId()), topics.get(1))) {
+                        return true;
+                    }
+                    if (!productEvent && entry.getTargetId() == null) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        } catch (Exception e) {
+            return false;
+        }
+    }
     /**
      * 比较两个十六进制值是否相同（忽略 0x 前缀与大小写）
      *
