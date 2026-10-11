@@ -19,6 +19,7 @@ services:
     environment:
       FOODTRACE_JWT_SECRET: ${FOODTRACE_JWT_SECRET}
       FOODTRACE_DB_PASSWORD: ${FOODTRACE_DB_PASSWORD}
+      FOODTRACE_TRUSTED_PROXIES: ${FOODTRACE_WEB_IP:-172.30.0.10}
       DB_HOST: ${DB_HOST:-host.docker.internal}
       WEBASE_SIGN_URL: ${WEBASE_SIGN_URL:-http://host.docker.internal:5004/WeBASE-Sign}
       FISCO_PEERS: ${FISCO_PEERS:-host.docker.internal:20200}
@@ -41,6 +42,9 @@ services:
 
   web:
     build: ../frontend
+    networks:
+      default:
+        ipv4_address: ${FOODTRACE_WEB_IP:-172.30.0.10}
     ports:
       - "${WEB_PORT:-8080}:80"
     volumes:
@@ -73,3 +77,9 @@ volumes:
   minio-data:
   prometheus-data:
   grafana-data:
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${FOODTRACE_SUBNET:-172.30.0.0/24}

@@ -123,3 +123,13 @@ Redis，缓存换分布式缓存或消息广播失效。
 
 多机部署时再逐段补齐：后端启用 HTTPS 并将 nginx 反代改为 https，
 JDBC 连接加 useSSL，WeBASE-Sign 换其自带的 HTTPS 端口。
+
+## 可信代理与限流
+
+Compose 固定 Nginx 的内部地址为 `172.30.0.10`，后端仅信任该地址传来的
+单值 `X-Forwarded-For`；Nginx 使用实际连接来源覆盖客户端传入的头。
+直接运行后端时默认不信任转发头。需要接入自己的反向代理时，显式设置
+`FOODTRACE_TRUSTED_PROXIES` 为代理 IP 或 CIDR（逗号分隔），并保证入口覆盖该头。
+
+若默认容器网段冲突，在 `.env` 中同时调整 `FOODTRACE_SUBNET` 和
+`FOODTRACE_WEB_IP`，后者必须属于前者。不要把任意来源配置成可信代理。

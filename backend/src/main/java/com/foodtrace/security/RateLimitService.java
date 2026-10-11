@@ -5,6 +5,12 @@ import com.foodtrace.common.ErrorCode;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.web.util.matcher.IpAddressMatcher;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.Arrays;
+import java.util.List;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -39,6 +45,8 @@ public class RateLimitService {
     private final LongSupplier clock;
     /** 指标注册表 */
     private final MeterRegistry meterRegistry;
+    /** 明确允许传递客户端 IP 的代理，默认不信任任何转发头 */
+    private final List<IpAddressMatcher> trustedProxies;
     /** 登录名 -> 失败统计 */
     private final Map<String, FailureWindow> loginFailures = new ConcurrentHashMap<>();
     /** 范围:IP -> 请求计数 */
@@ -50,8 +58,9 @@ public class RateLimitService {
      * @param meterRegistry 指标注册表
      */
     @Autowired
-    public RateLimitService(MeterRegistry meterRegistry) {
-        this(System::currentTimeMillis, meterRegistry);
+    public RateLimitService(MeterRegistry meterRegistry,
+                            @Value("${foodtrace.trusted-proxies:}") String trustedProxies) {
+        this(System::currentTimeMillis, meterRegistry, trustedProxies);
     }
 
     /**
@@ -61,8 +70,14 @@ public class RateLimitService {
      * @param meterRegistry  指标注册表
      */
     RateLimitService(LongSupplier clock, MeterRegistry meterRegistry) {
+        this(clock, meterRegistry, "");
+    }
+
+    RateLimitService(LongSupplier clock, MeterRegistry meterRegistry, String trustedProxies) {
         this.clock = clock;
         this.meterRegistry = meterRegistry;
+        this.trustedProxies = Arrays.stream(trustedProxies.split(","))
+                .map(String::trim).filter(ip -> !ip.isEmpty()).map(IpAddressMatcher::new).toList();
     }
 
     /**
@@ -134,19 +149,33 @@ public class RateLimitService {
     }
 
     /**
-     * 取客户端 IP：优先代理透传的 X-Forwarded-For 首段
+     * 取客户端 IP：仅接受可信代理覆盖后的单个地址
      *
      * @param request 当前请求
      * @return 客户端 IP
      */
-    private static String clientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
+    private String clientIp(HttpServletRequest request) {
+        String remote = request.getRemoteAddr();
+        if (trustedProxies.stream().noneMatch(proxy -> proxy.matches(remote))) {
+            return remote;
         }
-        return request.getRemoteAddr();
+        // 单层可信入口必须覆盖该头；多值或非法地址退回连接来源，避免伪造链条。
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded == null) {
+            return remote;
+        }
+        String ip = forwarded.trim();
+        boolean literal = ip.matches("[0-9]+(\\.[0-9]+){3}")
+                || (ip.contains(":") && ip.matches("[0-9a-fA-F:.]+"));
+        if (!literal) {
+            return remote;
+        }
+        try {
+            return InetAddress.getByName(ip).getHostAddress();
+        } catch (UnknownHostException e) {
+            return remote;
+        }
     }
-
     /**
      * 计数表过大时清理过期窗口
      */

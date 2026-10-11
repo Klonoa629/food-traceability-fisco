@@ -93,14 +93,41 @@ class RateLimitServiceTest {
     }
 
     @Test
-    void forwardedForHeaderShouldTakePrecedence() {
-        MockHttpServletRequest forwarded = new MockHttpServletRequest();
-        forwarded.setRemoteAddr("9.9.9.9");
-        forwarded.addHeader("X-Forwarded-For", "1.1.1.1, 2.2.2.2");
-        // 1.1.1.1 与 9.9.9.9 计数相互独立：对代理 IP 打满不影响真实客户端
+    void spoofedForwardedHeadersShouldNotBypassDirectConnectionLimit() {
         for (int i = 0; i < 20; i++) {
-            service.checkIpLimit(request("9.9.9.9"), "auth");
+            MockHttpServletRequest req = request("9.9.9.9");
+            req.addHeader("X-Forwarded-For", "1.1.1." + i);
+            service.checkIpLimit(req, "auth");
         }
-        assertThatCode(() -> service.checkIpLimit(forwarded, "auth")).doesNotThrowAnyException();
+        MockHttpServletRequest req = request("9.9.9.9");
+        req.addHeader("X-Forwarded-For", "2.2.2.2");
+        assertThatThrownBy(() -> service.checkIpLimit(req, "auth")).isInstanceOf(BizException.class);
+    }
+
+    @Test
+    void trustedProxyShouldKeepDifferentClientsIndependent() {
+        service = new RateLimitService(now::get, new SimpleMeterRegistry(), "172.30.0.10/32");
+        MockHttpServletRequest first = request("172.30.0.10");
+        first.addHeader("X-Forwarded-For", "1.1.1.1");
+        for (int i = 0; i < 20; i++) {
+            service.checkIpLimit(first, "auth");
+        }
+        assertThatThrownBy(() -> service.checkIpLimit(first, "auth")).isInstanceOf(BizException.class);
+        MockHttpServletRequest second = request("172.30.0.10");
+        second.addHeader("X-Forwarded-For", "2.2.2.2");
+        assertThatCode(() -> service.checkIpLimit(second, "auth")).doesNotThrowAnyException();
+    }
+
+    @Test
+    void malformedOrMultipleForwardedValuesShouldFallBackToPeer() {
+        service = new RateLimitService(now::get, new SimpleMeterRegistry(), "172.30.0.10");
+        for (int i = 0; i < 20; i++) {
+            service.checkIpLimit(request("172.30.0.10"), "auth");
+        }
+        for (String header : new String[]{"1.1.1.1, 2.2.2.2", "not-an-ip", "999.1.1.1"}) {
+            MockHttpServletRequest req = request("172.30.0.10");
+            req.addHeader("X-Forwarded-For", header);
+            assertThatThrownBy(() -> service.checkIpLimit(req, "auth")).isInstanceOf(BizException.class);
+        }
     }
 }

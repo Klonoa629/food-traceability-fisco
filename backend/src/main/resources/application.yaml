@@ -13,6 +13,7 @@ webase:
   app-id: foodtrace
 
 foodtrace:
+  trusted-proxies: ${FOODTRACE_TRUSTED_PROXIES:}
   contract-address: "${FOODTRACE_CONTRACT_ADDRESS:0x2af6160e266f763652f433a80b94fc13f4065303}"
   # 合约事件订阅（外部交易的缓存失效与审计）
   event-subscribe: true
